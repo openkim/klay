@@ -45,7 +45,6 @@ class ConvNetLayer(torch.nn.Module):
         node_attr_irreps,
         edge_attr_irreps,
         edge_embedding_irreps,        
-        convolution=InteractionBlock,
         convolution_kwargs: dict = {},
         resnet: bool = False,
         nonlinearity_type: str = "gate",
@@ -134,7 +133,7 @@ class ConvNetLayer(torch.nn.Module):
             self.resnet = False
 
         # override defaults for irreps:
-        self.conv = convolution(
+        self.conv = InteractionBlock(
             irreps_in=self.irreps_in,
             irreps_out=conv_irreps_out,
             node_attr_irreps=node_attr_irreps,

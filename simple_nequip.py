@@ -6,6 +6,7 @@ from layers import ConvNetLayer, InteractionBlock
 
 import yaml
 import sys
+from copy import deepcopy
 
 if len(sys.argv)!=2:
     raise ValueError("Should provide only one argument, which is the yaml config file")
@@ -19,11 +20,13 @@ print(config)
 n_elems = len(config["elements"])
 
 layer_dict = {}
+node_embedding_dim_list = []
 
 # element node embedding onehot
 elem_embedding_layer = e.OneHotAtomEncoding(n_elems)
 node_attr_irrep = elem_embedding_layer.irreps_out
 layer_dict["elem_embed"] = elem_embedding_layer
+node_embedding_dim_list.append(elem_embedding_layer.irreps_out)
 
 # edge embeddings
 p = -1 if config["parity"] else 1
@@ -46,6 +49,7 @@ first_atom_embedding = AtomwiseLinear(node_attr_irrep, node_feature_irrep)
 
 assert(node_feature_irrep == first_atom_embedding.irreps_out)
 layer_dict["first_atom_embed"] = first_atom_embedding
+node_embedding_dim_list.append(first_atom_embedding.irreps_out)
 
 # convolution layers
 node_feature_irrep_intermidiate = []
@@ -55,29 +59,17 @@ invariant_layers = config["radial_network_layers"]
 average_num_neigh = config["average_num_neigh"]
 conv_kw = {"invariant_layers": invariant_layers, "invariant_neurons": invariant_neurons, "avg_num_neighbors": average_num_neigh}
 
-conv1 = ConvNetLayer(
-            node_feature_irrep,
-            conv_hidden_irrep,
-            node_attr_irrep,
-            edge_attr_irrep,
-            edge_feature_irrep, 
-            convolution_kwargs=conv_kw)
-print(conv1.irreps_out)
-conv2 = ConvNetLayer(
-            conv1.irreps_out,
-            conv_hidden_irrep,
-            node_attr_irrep,
-            edge_attr_irrep,
-            edge_feature_irrep, 
-            convolution_kwargs=conv_kw)
-print(conv2.irreps_out)
-conv3 = ConvNetLayer(
-            conv2.irreps_out,
-            conv_hidden_irrep,
-            node_attr_irrep,
-            edge_attr_irrep,
-            edge_feature_irrep, 
-            convolution_kwargs=conv_kw)
-print(conv3.irreps_out)
+last_node_irrep = node_feature_irrep
+
 for i in range(config["n_conv_layers"]):
-    pass
+    conv_layer = ConvNetLayer(last_node_irrep,
+            conv_hidden_irrep,
+            node_attr_irrep,
+            edge_attr_irrep,
+            edge_feature_irrep,
+            convolution_kwargs=conv_kw)
+    node_embedding_dim_list.append(conv_layer.irreps_out)
+    layer_dict[f"conv:{i}"] = conv_layer
+    last_node_irrep = conv_layer.irreps_out
+
+print(node_embedding_dim_list)
