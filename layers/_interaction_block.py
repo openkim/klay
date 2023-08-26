@@ -8,10 +8,12 @@ from torch_runstats.scatter import scatter
 from e3nn import o3
 from e3nn.nn import FullyConnectedNet
 from e3nn.o3 import TensorProduct, Linear, FullyConnectedTensorProduct
+import math
 
-from nequip.data import AtomicDataDict
-from nequip.nn.nonlinearities import ShiftedSoftPlus
-from ._graph_mixin import GraphModuleMixin
+
+@torch.jit.script
+def ShiftedSoftPlus(x):
+    return torch.nn.functional.softplus(x) - math.log(2.0)
 
 
 class InteractionBlock(torch.nn.Module):
@@ -22,6 +24,9 @@ class InteractionBlock(torch.nn.Module):
         self,
         irreps_in,
         irreps_out,
+        node_attr_irreps,
+        edge_attr_irreps,
+        edge_embedding_irreps,
         invariant_layers=1,
         invariant_neurons=8,
         avg_num_neighbors=None,
@@ -42,34 +47,14 @@ class InteractionBlock(torch.nn.Module):
         :param use_sc: bool, use self-connection or not
         """
         super().__init__()
-
-        self._init_irreps(
-            irreps_in=irreps_in,
-            required_irreps_in=[
-                AtomicDataDict.EDGE_EMBEDDING_KEY,
-                AtomicDataDict.EDGE_ATTRS_KEY,
-                AtomicDataDict.NODE_FEATURES_KEY,
-                AtomicDataDict.NODE_ATTRS_KEY,
-            ],
-            my_irreps_in={
-                AtomicDataDict.EDGE_EMBEDDING_KEY: o3.Irreps(
-                    [
-                        (
-                            irreps_in[AtomicDataDict.EDGE_EMBEDDING_KEY].num_irreps,
-                            (0, 1),
-                        )
-                    ]  # (0, 1) is even (invariant) scalars. We are forcing the EDGE_EMBEDDING to be invariant scalars so we can use a dense network
-                )
-            },
-            irreps_out={AtomicDataDict.NODE_FEATURES_KEY: irreps_out},
-        )
+        my_irreps_in= o3.Irreps([(edge_embedding_irreps.num_irreps,(0, 1),)])
 
         self.avg_num_neighbors = avg_num_neighbors
         self.use_sc = use_sc
 
-        feature_irreps_in = self.irreps_in[AtomicDataDict.NODE_FEATURES_KEY]
-        feature_irreps_out = self.irreps_out[AtomicDataDict.NODE_FEATURES_KEY]
-        irreps_edge_attr = self.irreps_in[AtomicDataDict.EDGE_ATTRS_KEY]
+        feature_irreps_in = irreps_in
+        feature_irreps_out = irreps_out
+        irreps_edge_attr = edge_attr_irreps
 
         # - Build modules -
         self.linear_1 = Linear(
@@ -112,7 +97,7 @@ class InteractionBlock(torch.nn.Module):
 
         # init_irreps already confirmed that the edge embeddding is all invariant scalars
         self.fc = FullyConnectedNet(
-            [self.irreps_in[AtomicDataDict.EDGE_EMBEDDING_KEY].num_irreps]
+            [edge_embedding_irreps.num_irreps]
             + invariant_layers * [invariant_neurons]
             + [tp.weight_numel],
             {
@@ -138,9 +123,10 @@ class InteractionBlock(torch.nn.Module):
         if self.use_sc:
             self.sc = FullyConnectedTensorProduct(
                 feature_irreps_in,
-                self.irreps_in[AtomicDataDict.NODE_ATTRS_KEY],
+                node_attr_irreps,
                 feature_irreps_out,
             )
+        self.irreps_out = feature_irreps_out
 
 
     def forward(self, x, h, edge_length_embeddings, edge_sh, edge_index):

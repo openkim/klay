@@ -5,17 +5,18 @@ import logging
 from e3nn import o3
 from e3nn.nn import Gate, NormActivation
 import math
+from . import InteractionBlock
 
 def tp_path_exists(irreps_in1, irreps_in2, ir_out):
-    irreps_in1 = o3.irreps(irreps_in1).simplify()
-    irreps_in2 = o3.irreps(irreps_in2).simplify()
-    ir_out = o3.irrep(ir_out)
+    irreps_in1 = o3.Irreps(irreps_in1).simplify()
+    irreps_in2 = o3.Irreps(irreps_in2).simplify()
+    ir_out = o3.Irrep(ir_out)
 
     for _, ir1 in irreps_in1:
         for _, ir2 in irreps_in2:
             if ir_out in ir1 * ir2:
-                return true
-    return false
+                return True
+    return False
 
 @torch.jit.script
 def ShiftedSoftPlus(x):
@@ -39,11 +40,13 @@ class ConvNetLayer(torch.nn.Module):
 
     def __init__(
         self,
-        irreps_in,
+        irreps_in, # its node embedding
         feature_irreps_hidden,
+        node_attr_irreps,
+        edge_attr_irreps,
+        edge_embedding_irreps,        
         convolution=InteractionBlock,
         convolution_kwargs: dict = {},
-        num_layers: int = 3,
         resnet: bool = False,
         nonlinearity_type: str = "gate",
         nonlinearity_scalars: Dict[int, Callable] = {"e": "ssp", "o": "tanh"},
@@ -62,25 +65,17 @@ class ConvNetLayer(torch.nn.Module):
             -1: nonlinearity_gates["o"],
         }
 
-        self.feature_irreps_hidden = o3.Irreps(feature_irreps_hidden)
+        self.feature_irreps_hidden = feature_irreps_hidden
         self.resnet = resnet
-        self.num_layers = num_layers
 
-        # We'll set irreps_out later when we know them
-        self._init_irreps(
-            irreps_in=irreps_in,
-            required_irreps_in=[AtomicDataDict.NODE_FEATURES_KEY],
-        )
-
-        edge_attr_irreps = self.irreps_in[AtomicDataDict.EDGE_ATTRS_KEY]
-        irreps_layer_out_prev = self.irreps_in[AtomicDataDict.NODE_FEATURES_KEY]
+        self.irreps_in = irreps_in
 
         irreps_scalars = o3.Irreps(
             [
                 (mul, ir)
                 for mul, ir in self.feature_irreps_hidden
                 if ir.l == 0
-                and tp_path_exists(irreps_layer_out_prev, edge_attr_irreps, ir)
+                and tp_path_exists(irreps_in, edge_attr_irreps, ir)
             ]
         )
 
@@ -89,7 +84,7 @@ class ConvNetLayer(torch.nn.Module):
                 (mul, ir)
                 for mul, ir in self.feature_irreps_hidden
                 if ir.l > 0
-                and tp_path_exists(irreps_layer_out_prev, edge_attr_irreps, ir)
+                and tp_path_exists(irreps_in, edge_attr_irreps, ir)
             ]
         )
 
@@ -98,7 +93,7 @@ class ConvNetLayer(torch.nn.Module):
         if nonlinearity_type == "gate":
             ir = (
                 "0e"
-                if tp_path_exists(irreps_layer_out_prev, edge_attr_irreps, "0e")
+                if tp_path_exists(irreps_in, edge_attr_irreps, "0e")
                 else "0o"
             )
             irreps_gates = o3.Irreps([(mul, ir) for mul, _ in irreps_gated])
@@ -132,33 +127,24 @@ class ConvNetLayer(torch.nn.Module):
         self.equivariant_nonlin = equivariant_nonlin
 
         # TODO: partial resnet?
-        if irreps_layer_out == irreps_layer_out_prev and resnet:
+        if irreps_layer_out == irreps_in and resnet:
             # We are doing resnet updates and can for this layer
             self.resnet = True
         else:
             self.resnet = False
 
-        # TODO: last convolution should go to explicit irreps out
-        logging.debug(
-            f" parameters used to initialize {convolution.__name__}={convolution_kwargs}"
-        )
-
         # override defaults for irreps:
-        convolution_kwargs.pop("irreps_in", None)
-        convolution_kwargs.pop("irreps_out", None)
         self.conv = convolution(
             irreps_in=self.irreps_in,
             irreps_out=conv_irreps_out,
-            **convolution_kwargs,
+            node_attr_irreps=node_attr_irreps,
+            edge_attr_irreps=edge_attr_irreps,
+            edge_embedding_irreps=edge_embedding_irreps,
+            **convolution_kwargs
         )
-
         # The output features are whatever we got in
         # updated with whatever the convolution outputs (which is a full graph module)
-        self.irreps_out.update(self.conv.irreps_out)
-        # but with the features updated by the nonlinearity
-        self.irreps_out[
-            AtomicDataDict.NODE_FEATURES_KEY
-        ] = self.equivariant_nonlin.irreps_out
+        self.irreps_out = self.equivariant_nonlin.irreps_out
 
     def forward(self, x, h, edge_length_embeddings, edge_sh, edge_index):
         # save old features for resnet

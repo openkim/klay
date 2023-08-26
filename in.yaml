@@ -17,7 +17,6 @@ nonlinearity_gates:
 # ======== radial basis ==============
 r_max: 4.0 # cutoff
 n_radial_basis: 8   # number of radial basis functions
-node_feature_size: 32 # higher order node features?
 p: 6 # polynomial degree, default 6
 
 
@@ -25,8 +24,13 @@ p: 6 # polynomial degree, default 6
 lmax: 2
 
 
-# Conv network   
+# ======== Conv network ==============
 n_conv_layers: 3
+conv_feature_size: 32 # width of conv layer features, kind of like number of channels in CNN
+radial_network_layers: 2 # layers in FCN to be applied to radial feature
+radial_network_hidden_dim: 64
+average_num_neigh: 1.0
 
+# ======== final ======================
 out_irrep: "1x0e+1x1o"
 
