@@ -1,0 +1,30 @@
+# Input file for directly generating nequil equivalent networks
+elements: # list all elements present
+  - Si
+
+# ========= Misc info ================
+parity: true
+nonlinearity_type: gate                                                           # may be 'gate' or 'norm', 'gate' is recommended
+nonlinearity_scalars:
+  e: silu
+  o: tanh
+nonlinearity_gates:
+  e: silu
+  o: tanh
+
+
+# ======== radial basis ==============
+cutoff: 4.0
+n_radial_basis: 8   # number of radial basis functions
+node_feature_size: 32 # higher order node features?
+
+
+# ======== edges rep =================
+lmax: 2
+
+
+# Conv network   
+n_conv_layers: 3
+
+out_irrep: "1x0e+1x1o"
+
