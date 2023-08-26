@@ -7,10 +7,6 @@ from torch_runstats.scatter import scatter
 
 from e3nn.o3 import Linear
 
-# from nequip.data import AtomicDataDict
-# from nequip.data.transforms import TypeMapper
-from ._graph_mixin import GraphModuleMixin
-
 
 # class AtomwiseOperation(torch.nn.Module):
 #     def __init__(self, operation, field: str, irreps_in=None):

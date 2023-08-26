@@ -4,15 +4,22 @@ import logging
 
 from e3nn import o3
 from e3nn.nn import Gate, NormActivation
+import math
 
-from nequip.data import AtomicDataDict
-from nequip.nn import (
-    GraphModuleMixin,
-    InteractionBlock,
-)
-from nequip.nn.nonlinearities import ShiftedSoftPlus
-from nequip.utils.tp_utils import tp_path_exists
+def tp_path_exists(irreps_in1, irreps_in2, ir_out):
+    irreps_in1 = o3.irreps(irreps_in1).simplify()
+    irreps_in2 = o3.irreps(irreps_in2).simplify()
+    ir_out = o3.irrep(ir_out)
 
+    for _, ir1 in irreps_in1:
+        for _, ir2 in irreps_in2:
+            if ir_out in ir1 * ir2:
+                return true
+    return false
+
+@torch.jit.script
+def ShiftedSoftPlus(x):
+    return torch.nn.functional.softplus(x) - math.log(2.0)
 
 acts = {
     "abs": torch.abs,
@@ -22,7 +29,7 @@ acts = {
 }
 
 
-class ConvNetLayer(GraphModuleMixin, torch.nn.Module):
+class ConvNetLayer(torch.nn.Module):
     """
     Args:
 

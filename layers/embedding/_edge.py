@@ -22,23 +22,18 @@ class SphericalHarmonicEdgeAttrs(torch.nn.Module):
         out_field (str, default: AtomicDataDict.EDGE_ATTRS_KEY: data/irreps field
     """
 
-    out_field: str
-
     def __init__(
         self,
-        irreps_edge_sh: Union[int, str, o3.Irreps],
+        irreps_in: Union[int, str, o3.Irreps],
         edge_sh_normalization: str = "component",
-        edge_sh_normalize: bool = True,
-        irreps_in=None,
-        out_field: str = None):
+        edge_sh_normalize: bool = True):
         super().__init__()
-        self.out_field = out_field
 
-        if isinstance(irreps_edge_sh, int):
-            self.irreps_edge_sh = o3.Irreps.spherical_harmonics(irreps_edge_sh)
+        if isinstance(irreps_in, int):
+            self.irreps_edge_sh = o3.Irreps.spherical_harmonics(irreps_in)
         else:
-            self.irreps_edge_sh = o3.Irreps(irreps_edge_sh)
-        self.irreps_in=irreps_in,
+            self.irreps_edge_sh = o3.Irreps(irreps_in)
+        self.irreps_in=irreps_in
         self.irreps_out=self.irreps_edge_sh
         self.sh = o3.SphericalHarmonics(
             self.irreps_edge_sh, edge_sh_normalize, edge_sh_normalization
@@ -52,21 +47,16 @@ class SphericalHarmonicEdgeAttrs(torch.nn.Module):
 
 @compile_mode("script")
 class RadialBasisEdgeEncoding(torch.nn.Module):
-    out_field: str
-
     def __init__(
         self,
         basis=BesselBasis,
         cutoff=PolynomialCutoff,
         basis_kwargs={},
         cutoff_kwargs={},
-        irreps_in=None,
     ):
         super().__init__()
         self.basis = basis(**basis_kwargs)
         self.cutoff = cutoff(**cutoff_kwargs)
-        self.out_field = out_field
-        self.irreps_in = irreps_in
         self.irreps_out= o3.Irreps([(self.basis.num_basis, (0, 1))])
 
     def forward(self, edge_vectors):
