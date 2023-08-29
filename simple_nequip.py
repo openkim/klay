@@ -85,7 +85,7 @@ def gen_model(yaml_file, save=True):
     if save:
         model = jit.script(model)
         model.save(f"{config['model_name']}.pt")
-    return model, layer_dict
+    return model
 
 
 if __name__ == "__main__":
