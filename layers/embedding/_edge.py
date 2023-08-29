@@ -39,10 +39,12 @@ class SphericalHarmonicEdgeAttrs(torch.nn.Module):
             self.irreps_edge_sh, edge_sh_normalize, edge_sh_normalization
         )
 
-    def forward(self, pos, edge_index):
+    def forward(self, pos, edge_index, period_vec):
         edge_vec = pos[edge_index[1]] - pos[edge_index[0]]
+        edge_vec = edge_vec - period_vec
+        edge_length = torch.linalg.norm(edge_vec, dim=1)
         edge_sh = self.sh(edge_vec)
-        return edge_vec, edge_sh
+        return edge_vec, edge_length, edge_sh
 
 
 @compile_mode("script")
@@ -59,9 +61,8 @@ class RadialBasisEdgeEncoding(torch.nn.Module):
         self.cutoff = cutoff(**cutoff_kwargs)
         self.irreps_out= o3.Irreps([(self.basis.num_basis, (0, 1))])
 
-    def forward(self, edge_vectors):
-        edge_length = torch.linalg.norm(edge_vectors, dim=1)
+    def forward(self, edge_length):
         edge_length_embedded = (
             self.basis(edge_length) * self.cutoff(edge_length)[:, None]
         )
-        return edge_length, edge_length_embedded
+        return edge_length_embedded

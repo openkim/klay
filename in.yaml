@@ -1,11 +1,17 @@
 # Input file for directly generating nequil equivalent networks
+model_name: "Si_nequip_EF"
 elements: # list all elements present
   - Si
-  - Al
 
 # ========= Misc info ================
 parity: true
-nonlinearity_type: gate                                                           # may be 'gate' or 'norm', 'gate' is recommended
+nonlinearity_type: gate   # may be 'gate' or 'norm'
+scaling:
+  - energy: 1.0
+  - force: 1.0
+shifting:
+  - energy: 0.0
+  - force: 0.0
 nonlinearity_scalars:
   e: silu
   o: tanh
@@ -32,5 +38,9 @@ radial_network_hidden_dim: 64
 average_num_neigh: 1.0
 
 # ======== final ======================
-out_irrep: "1x0e+1x1o"
+post_conv_layers: 3
+post_conv_irreps: # expected repr at end of each layer
+  - "16x0e+16x1o+16x0o+16x1e"
+  - "8x0e+8x1o+8x0o+8x1e"
+  - "1x0e+1x1o"
 
