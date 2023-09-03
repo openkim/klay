@@ -14,7 +14,7 @@ class NL_model(torch.nn.Module):
         self.edge_attr_layer = layer_dict["edge_embed"]
         self.edge_embedding_layer = layer_dict["radial_basis"]
         self.conv_layers = torch.nn.ModuleList([layer_dict["conv:0"], layer_dict["conv:1"], layer_dict["conv:2"]])
-        self.post_conv_layers = torch.nn.ModuleList([layer_dict["post_conv:0"],layer_dict["post_conv:1"],layer_dict["post_conv:2"]])
+        self.post_conv_layers = torch.nn.ModuleList([layer_dict["post_conv:0"],layer_dict["post_conv:1"]])
         self.register_buffer("energy_scaling_coeff", torch.tensor(energy_scaling_coeff))
         self.register_buffer("force_scaling_coeff", torch.tensor(force_scaling_coeff))
         self.register_buffer("energy_shifting_coeff", torch.tensor(energy_shifting_coeff))

@@ -82,6 +82,7 @@ def gen_model(yaml_file, save=True):
                     config["scaling"][1]["force"],
                     config["shifting"][0]["energy"],
                     config["shifting"][1]["force"])
+    print(model)
     if save:
         model = jit.script(model)
         model.save(f"{config['model_name']}.pt")
@@ -93,3 +94,6 @@ if __name__ == "__main__":
         raise ValueError("Should provide only one argument, which is the yaml config file")    
     yaml_file = sys.argv[1]
     model = gen_model(yaml_file)
+    pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"Number of model params: {pytorch_total_params}")
+
