@@ -1,0 +1,19 @@
+# Files
+model_file: "../Si_NEQUIP_EF_Cubuck.pt"
+dataset_file: "../data/dataset_Si_Cubuck_full_stride_20.pt"
+indices_file: "../data/dataset_Si_Cubuck_full_stride_20_indices.txt"
+
+# Training
+n_train: 10
+n_val: 10
+energy_weight: 1.0
+force_weight: 10.0
+batch_size: 10
+
+# Hardware
+device: "None" # or gpu
+gpus: 0 # if above is gpu
+max_epochs: 10
+max_time: "1:00:00:00" # days:hours:minutes:seconds
+num_workers: 1
+

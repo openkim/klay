@@ -78,10 +78,8 @@ def gen_model(yaml_file, save=True):
         node_embedding_dim_list.append(last_node_irrep)
 
     model = NL_model(layer_dict, 
-                    config["scaling"][0]["energy"],
-                    config["scaling"][1]["force"],
-                    config["shifting"][0]["energy"],
-                    config["shifting"][1]["force"])
+                    energy_scaling_coeff=config["scale"],
+                    energy_shifting_coeff=config["shift"])
     print(model)
     if save:
         model = jit.script(model)
