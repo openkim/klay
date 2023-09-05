@@ -1,3 +1,4 @@
+import os
 import sys
 import yaml
 import numpy as np
@@ -11,12 +12,34 @@ from CoRe import CoRe
 
 torch.set_default_dtype(torch.float32)
 
+from pytorch_lightning.loggers import CSVLogger, TensorBoardLogger
+from pytorch_lightning.callbacks import ModelCheckpoint
+
+class PeriodicCheckpoint(ModelCheckpoint):
+    def __init__(self, every: int):
+        super().__init__(period=-1)
+        self.every = every
+
+    def on_train_batch_end(
+        self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs
+    ):
+        if pl_module.global_step % self.every == 0:
+            assert self.dirpath is not None
+            current = Path(self.dirpath) / f"latest-{pl_module.global_step}.ckpt"
+            prev = (
+                Path(self.dirpath) / f"latest-{pl_module.global_step - self.every}.ckpt"
+            )
+            trainer.save_checkpoint(current)
+            prev.unlink(missing_ok=True)
+
+
 class LightningWrapper(L.LightningModule):
     def __init__(self, model, energy_weight=1.0, force_weight=10.0):
         super().__init__()
         self.model = model.float()
         self.energy_weight = energy_weight
         self.force_weight = force_weight
+        self.val_step = 1
 
     def forward(self, x, pos, edge_index, periodic_vec, batch_contrib):
         # pos.requires_grad_(True)
@@ -33,6 +56,13 @@ class LightningWrapper(L.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
+        # save as chkpoint
+        try:
+            os.mkdir("checkpoints")
+        except FileExistsError:
+            pass
+        self.model.save(f"checkpoints/{self.val_step:06d}.pt")
+
         torch.set_grad_enabled(True)
         x, pos, edge_index, periodic_vec, batch_contrib, E_target, F_target = batch.tags, batch.pos.requires_grad_(True), batch.edge_index, batch.periodic_vec, batch.batch, batch.y.float(), batch.force
         E, F = self.forward(x, pos, edge_index, periodic_vec, batch_contrib)
@@ -89,6 +119,9 @@ if __name__ == "__main__":
     val_dataset = dataset[val_indices]
     print(f"Loaded dataset: {dataset_file} \n Indices: {indices_file}")
 
+    logger_csv = CSVLogger(f"lightning_logs/logs/CSV")
+    logger_tb = TensorBoardLogger(save_dir=f"lightning_logs/logs/TB")
+    
     #lightning_datamodule = pyg.data.lightning_datamodule.LightningDataset(train_dataset, val_dataset=val_dataset, batch_size=config["batch_size"], num_workers=config["num_workers"] )
     train_loader = pyg.loader.DataLoader(train_dataset, batch_size=config["batch_size"], num_workers=config["num_workers"])
     val_loader = pyg.loader.DataLoader(val_dataset, batch_size=config["batch_size"], num_workers=config["num_workers"])
@@ -102,9 +135,10 @@ if __name__ == "__main__":
         max_time = None
 
     if config["device"] == "gpu":
-        trainer = L.Trainer(strategy="ddp", accelerator="gpu", devices=config["gpus"], max_epochs=config["max_epochs"],max_time=max_time)
+        trainer = L.Trainer(strategy="ddp", accelerator="gpu", devices=config["gpus"], max_epochs=config["max_epochs"],max_time=max_time,logger=[logger_tb, logger_csv])
     else:
-        trainer = L.Trainer(max_epochs=config["max_epochs"], max_time=max_time)
+        #trainer = L.Trainer(max_epochs=config["max_epochs"], max_time=max_time,logger=[logger_tb, logger_csv])
+        trainer = L.Trainer(max_epochs=config["max_epochs"], max_time=max_time,logger=[logger_tb, logger_csv])
     print("Starting training.")
     trainer.fit(lightning_model, train_loader, val_loader)
     print("Done.")
