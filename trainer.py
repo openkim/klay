@@ -15,31 +15,32 @@ torch.set_default_dtype(torch.float32)
 from pytorch_lightning.loggers import CSVLogger, TensorBoardLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
 
-class PeriodicCheckpoint(ModelCheckpoint):
-    def __init__(self, every: int):
-        super().__init__(period=-1)
-        self.every = every
-
-    def on_train_batch_end(
-        self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs
-    ):
-        if pl_module.global_step % self.every == 0:
-            assert self.dirpath is not None
-            current = Path(self.dirpath) / f"latest-{pl_module.global_step}.ckpt"
-            prev = (
-                Path(self.dirpath) / f"latest-{pl_module.global_step - self.every}.ckpt"
-            )
-            trainer.save_checkpoint(current)
-            prev.unlink(missing_ok=True)
-
+#class PeriodicCheckpoint(ModelCheckpoint):
+#    def __init__(self, every: int):
+#        super().__init__(period=-1)
+#        self.every = every
+#
+#    def on_train_batch_end(
+#        self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs
+#    ):
+#        if pl_module.global_step % self.every == 0:
+#            assert self.dirpath is not None
+#            current = Path(self.dirpath) / f"latest-{pl_module.global_step}.ckpt"
+#            prev = (
+#                Path(self.dirpath) / f"latest-{pl_module.global_step - self.every}.ckpt"
+#            )
+#            trainer.save_checkpoint(current)
+#            prev.unlink(missing_ok=True)
+#
 
 class LightningWrapper(L.LightningModule):
-    def __init__(self, model, energy_weight=1.0, force_weight=10.0):
+    def __init__(self, model, energy_weight=1.0, force_weight=10.0, batch_size=5):
         super().__init__()
         self.model = model.float()
         self.energy_weight = energy_weight
         self.force_weight = force_weight
         self.val_step = 1
+        self.batch_size = batch_size
 
     def forward(self, x, pos, edge_index, periodic_vec, batch_contrib):
         # pos.requires_grad_(True)
@@ -52,7 +53,7 @@ class LightningWrapper(L.LightningModule):
         E, F = self.forward(x, pos, edge_index, periodic_vec, batch_contrib)
         loss = torch.nn.functional.mse_loss(E, E_target.view(-1,1)) * self.energy_weight 
         loss += torch.nn.functional.mse_loss(F, F_target) * self.force_weight
-        self.log("train_loss", loss, on_epoch=True)
+        self.log("train_loss", loss, on_epoch=True,batch_size=self.batch_size)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -62,15 +63,16 @@ class LightningWrapper(L.LightningModule):
         except FileExistsError:
             pass
         self.model.save(f"checkpoints/{self.val_step:06d}.pt")
+        self.val_step += 1
 
         torch.set_grad_enabled(True)
         x, pos, edge_index, periodic_vec, batch_contrib, E_target, F_target = batch.tags, batch.pos.requires_grad_(True), batch.edge_index, batch.periodic_vec, batch.batch, batch.y.float(), batch.force
         E, F = self.forward(x, pos, edge_index, periodic_vec, batch_contrib)
         eloss = torch.nn.functional.mse_loss(E, E_target.view(-1,1)) * self.energy_weight 
         floss = torch.nn.functional.mse_loss(F, F_target) * self.force_weight
-        self.log("val_loss", eloss + floss, on_epoch=True)
-        self.log("val_e_loss", eloss, on_epoch=True)
-        self.log("val_f_loss", floss, on_epoch=True)
+        self.log("val_loss", eloss + floss, on_epoch=True,batch_size=self.batch_size)
+        self.log("val_e_loss", eloss, on_epoch=True,batch_size=self.batch_size)
+        self.log("val_f_loss", floss, on_epoch=True,batch_size=self.batch_size)
 
 
     def configure_optimizers(self):
@@ -127,7 +129,7 @@ if __name__ == "__main__":
     val_loader = pyg.loader.DataLoader(val_dataset, batch_size=config["batch_size"], num_workers=config["num_workers"])
     print("Initialized datamodule.")
 
-    lightning_model = LightningWrapper(model, energy_weight=config["energy_weight"], force_weight=config["force_weight"])
+    lightning_model = LightningWrapper(model, energy_weight=config["energy_weight"], force_weight=config["force_weight"], batch_size=config["batch_size"])
     print("Initialized model.")
     if "max_time" in config:
         max_time = config["max_time"]
@@ -135,10 +137,10 @@ if __name__ == "__main__":
         max_time = None
 
     if config["device"] == "gpu":
-        trainer = L.Trainer(strategy="ddp", accelerator="gpu", devices=config["gpus"], max_epochs=config["max_epochs"],max_time=max_time,logger=[logger_tb, logger_csv])
+        trainer = L.Trainer(strategy="ddp", accelerator="gpu", devices=config["gpus"], max_epochs=config["max_epochs"],max_time=max_time,logger=[logger_tb, logger_csv],enable_checkpointing=True)
     else:
-        #trainer = L.Trainer(max_epochs=config["max_epochs"], max_time=max_time,logger=[logger_tb, logger_csv])
-        trainer = L.Trainer(max_epochs=config["max_epochs"], max_time=max_time,logger=[logger_tb, logger_csv])
+        trainer = L.Trainer(max_epochs=config["max_epochs"], max_time=max_time,logger=[logger_tb, logger_csv],enable_checkpointing=True)
     print("Starting training.")
+    #trainer.fit(lightning_model, train_loader, val_loader,ckpt_path="lightning_logs/logs/TB/lightning_logs/version_1/checkpoints/epoch=9-step=10.ckpt")
     trainer.fit(lightning_model, train_loader, val_loader)
     print("Done.")

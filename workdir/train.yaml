@@ -13,7 +13,7 @@ batch_size: 10
 # Hardware
 device: "None" # or gpu
 gpus: 0 # if above is gpu
-max_epochs: 10
+max_epochs: 20
 max_time: "1:00:00:00" # days:hours:minutes:seconds
-num_workers: 1
+num_workers: 16
 
