@@ -46,7 +46,7 @@ class LightningWrapper(L.LightningModule):
         # pos.requires_grad_(True)
         E = self.model(x, pos, edge_index, periodic_vec, batch_contrib)
         F, = torch.autograd.grad([E], [pos], create_graph=True, grad_outputs=torch.ones_like(E))
-        return E, F
+        return E, -F
 
     def training_step(self, batch, batch_idx):
         x, pos, edge_index, periodic_vec, batch_contrib, E_target, F_target = batch.tags, batch.pos.requires_grad_(True), batch.edge_index, batch.periodic_vec, batch.batch, batch.y.float(), batch.force
