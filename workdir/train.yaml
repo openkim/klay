@@ -9,6 +9,7 @@ n_val: 10
 energy_weight: 1.0
 force_weight: 10.0
 batch_size: 10
+checkpoint_every: 3
 
 # Hardware
 device: "None" # or gpu

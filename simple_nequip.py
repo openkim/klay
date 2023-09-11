@@ -91,6 +91,7 @@ if __name__ == "__main__":
     if len(sys.argv)!=2:
         raise ValueError("Should provide only one argument, which is the yaml config file")    
     yaml_file = sys.argv[1]
+    torch.manual_seed(42)
     model = gen_model(yaml_file)
     pytorch_total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"Number of model params: {pytorch_total_params}")

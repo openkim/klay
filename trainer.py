@@ -10,37 +10,42 @@ from torch_scatter import scatter
 
 from CoRe import CoRe
 
+from torch_ema import ExponentialMovingAverage
+
 torch.set_default_dtype(torch.float32)
 
 from pytorch_lightning.loggers import CSVLogger, TensorBoardLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
 
-#class PeriodicCheckpoint(ModelCheckpoint):
-#    def __init__(self, every: int):
-#        super().__init__(period=-1)
-#        self.every = every
-#
-#    def on_train_batch_end(
-#        self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs
-#    ):
-#        if pl_module.global_step % self.every == 0:
-#            assert self.dirpath is not None
-#            current = Path(self.dirpath) / f"latest-{pl_module.global_step}.ckpt"
-#            prev = (
-#                Path(self.dirpath) / f"latest-{pl_module.global_step - self.every}.ckpt"
-#            )
-#            trainer.save_checkpoint(current)
-#            prev.unlink(missing_ok=True)
-#
+class PeriodicEpochCheckpoint(L.pytorch.callbacks.ModelCheckpoint):
+    def __init__(self, every: int, checkpoint_dirpath: str = "manual_ckpts"):
+        super().__init__()
+        self.every = every
+        self.ckpt_dirpath = checkpoint_dirpath
+
+    def on_train_batch_end(
+        self, trainer: L.Trainer, pl_module: L.LightningModule, *args, **kwargs
+    ):
+        if pl_module.current_epoch % self.every == 0:
+            os.makedirs(self.ckpt_dirpath, exist_ok=True)
+            epoch_path = f"{self.ckpt_dirpath}/Epoch_{pl_module.current_epoch:06d}"
+            os.makedirs(f"{epoch_path}", exist_ok=True)
+            # Save the model
+            pl_module.model.save(f"{epoch_path}/model.pt")
+            # Save the optimizer
+            torch.save(pl_module.optimizer.state_dict(), f"{epoch_path}/optimizer_state.pt")
+
 
 class LightningWrapper(L.LightningModule):
-    def __init__(self, model, energy_weight=1.0, force_weight=10.0, batch_size=5):
+    def __init__(self, model, energy_weight=1.0, force_weight=10.0, batch_size=5, decay=0.99):
         super().__init__()
         self.model = model.float()
         self.energy_weight = energy_weight
         self.force_weight = force_weight
         self.val_step = 1
         self.batch_size = batch_size
+        self.optimizer = None
+        self.ema = ExponentialMovingAverage(self.model.parameters(), decay=decay)
 
     def forward(self, x, pos, edge_index, periodic_vec, batch_contrib):
         # pos.requires_grad_(True)
@@ -58,13 +63,6 @@ class LightningWrapper(L.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         # save as chkpoint
-        try:
-            os.mkdir("checkpoints")
-        except FileExistsError:
-            pass
-        self.model.save(f"checkpoints/{self.val_step:06d}.pt")
-        self.val_step += 1
-
         torch.set_grad_enabled(True)
         x, pos, edge_index, periodic_vec, batch_contrib, E_target, F_target = batch.tags, batch.pos.requires_grad_(True), batch.edge_index, batch.periodic_vec, batch.batch, batch.y.float(), batch.force
         E, F = self.forward(x, pos, edge_index, periodic_vec, batch_contrib)
@@ -74,16 +72,18 @@ class LightningWrapper(L.LightningModule):
         self.log("val_e_loss", eloss, on_epoch=True,batch_size=self.batch_size)
         self.log("val_f_loss", floss, on_epoch=True,batch_size=self.batch_size)
 
-
-    def configure_optimizers(self):
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001, amsgrad=True)
-        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,
-                        patience=50,factor=0.5,)
-        return {"optimizer": self.optimizer, "lr_scheduler": {"scheduler": self.scheduler, "monitor":"val_loss"}}
+    def on_before_zero_grad(self, *args, **kwargs):
+        self.ema.update(model.parameters())
 
 #    def configure_optimizers(self):
-#        self.optimizer = CoRe(self.parameters)
-#        return self.optimizer # keeping everything default
+#        self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001, amsgrad=True)
+#        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,
+#                        patience=50,factor=0.5,)
+#        return {"optimizer": self.optimizer, "lr_scheduler": {"scheduler": self.scheduler, "monitor":"val_loss"}}
+
+    def configure_optimizers(self):
+        self.optimizer = CoRe(self.parameters(), lr=0.001)
+        return self.optimizer # keeping everything default
 
 
 ####################################################
@@ -105,6 +105,8 @@ if __name__ == "__main__":
     yaml_file = sys.argv[1]
     config = yaml.safe_load(open(yaml_file))
     print(f"Config: {config}") 
+
+    L.pytorch.seed_everything(42, workers=True)
 
     model_file = config["model_file"]
     dataset_file = config["dataset_file"]
@@ -137,9 +139,9 @@ if __name__ == "__main__":
         max_time = None
 
     if config["device"] == "gpu":
-        trainer = L.Trainer(strategy="ddp", accelerator="gpu", devices=config["gpus"], max_epochs=config["max_epochs"],max_time=max_time,logger=[logger_tb, logger_csv],enable_checkpointing=True)
+        trainer = L.Trainer(accelerator="gpu", devices=config["gpus"], max_epochs=config["max_epochs"],max_time=max_time,logger=[logger_tb, logger_csv],enable_checkpointing=True,callbacks=[PeriodicEpochCheckpoint(every=config["checkpoint_every"])])
     else:
-        trainer = L.Trainer(max_epochs=config["max_epochs"], max_time=max_time,logger=[logger_tb, logger_csv],enable_checkpointing=True)
+        trainer = L.Trainer(max_epochs=config["max_epochs"], max_time=max_time,logger=[logger_tb, logger_csv],enable_checkpointing=True,deterministic=True,callbacks=[PeriodicEpochCheckpoint(every=config["checkpoint_every"])])
     print("Starting training.")
     #trainer.fit(lightning_model, train_loader, val_loader,ckpt_path="lightning_logs/logs/TB/lightning_logs/version_1/checkpoints/epoch=9-step=10.ckpt")
     trainer.fit(lightning_model, train_loader, val_loader)
