@@ -18,7 +18,7 @@ def tp_path_exists(irreps_in1, irreps_in2, ir_out):
                 return True
     return False
 
-@torch.jit.script
+#@torch.jit.script # removing scripting to avoid the Nan bug
 def ShiftedSoftPlus(x):
     return torch.nn.functional.softplus(x) - math.log(2.0)
 

@@ -7,6 +7,7 @@ import lightning as L
 import torch
 import torch_geometric as pyg
 from torch_scatter import scatter
+from simple_nequip import gen_model
 
 from CoRe import CoRe
 
@@ -31,21 +32,32 @@ class PeriodicEpochCheckpoint(L.pytorch.callbacks.ModelCheckpoint):
             epoch_path = f"{self.ckpt_dirpath}/Epoch_{pl_module.current_epoch:06d}"
             os.makedirs(f"{epoch_path}", exist_ok=True)
             # Save the model
-            pl_module.model.save(f"{epoch_path}/model.pt")
+            if pl_module.ts: # if it is a torchscript model
+                pl_module.model.save(f"{epoch_path}/model.pt")
+            else: # if it is a yaml model
+                torch.save(pl_module.model.state_dict(), f"{epoch_path}/model_state.pth")
             # Save the optimizer
-            torch.save(pl_module.optimizer.state_dict(), f"{epoch_path}/optimizer_state.pt")
+            torch.save(pl_module.optimizer.state_dict(), f"{epoch_path}/optimizer_state.pth")
 
 
 class LightningWrapper(L.LightningModule):
-    def __init__(self, model, energy_weight=1.0, force_weight=10.0, batch_size=5, decay=0.99):
+    def __init__(self, model, energy_weight=1.0, force_weight=10.0, batch_size=5, decay=0.99, ts=False, device="cuda"):
         super().__init__()
-        self.model = model.float()
+        if ts:
+            self.model = model.float()
+        else:
+            # model is a input yaml file
+            self.model = gen_model(model, save=False)
+        print(type(self.model))
+        self.ts = ts
         self.energy_weight = energy_weight
         self.force_weight = force_weight
         self.val_step = 1
         self.batch_size = batch_size
         self.optimizer = None
-        self.ema = ExponentialMovingAverage(self.model.parameters(), decay=decay)
+        ema = ExponentialMovingAverage(self.model.parameters(), decay=decay)
+        ema.to(device)
+        self.ema = ema
 
     def forward(self, x, pos, edge_index, periodic_vec, batch_contrib):
         # pos.requires_grad_(True)
@@ -73,7 +85,7 @@ class LightningWrapper(L.LightningModule):
         self.log("val_f_loss", floss, on_epoch=True,batch_size=self.batch_size)
 
     def on_before_zero_grad(self, *args, **kwargs):
-        self.ema.update(model.parameters())
+        self.ema.update(self.model.parameters())
 
 #    def configure_optimizers(self):
 #        self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001, amsgrad=True)
@@ -109,11 +121,18 @@ if __name__ == "__main__":
     L.pytorch.seed_everything(42, workers=True)
 
     model_file = config["model_file"]
+    if model_file[-3:] == ".pt":
+        ts = True
+    else:
+        ts = False
     dataset_file = config["dataset_file"]
     indices_file = config["indices_file"]
-
-    model = torch.jit.load(model_file)
-    print(f"Loaded model: {model_file}")
+    
+    if ts:
+        model = torch.jit.load(model_file)
+        print(f"Loaded model: {model_file}")
+    else:
+        model = model_file # will be converted later
 
     indices = np.loadtxt(indices_file, dtype=int)
     train_indices = indices[:config["n_train"]]
@@ -131,14 +150,20 @@ if __name__ == "__main__":
     val_loader = pyg.loader.DataLoader(val_dataset, batch_size=config["batch_size"], num_workers=config["num_workers"])
     print("Initialized datamodule.")
 
-    lightning_model = LightningWrapper(model, energy_weight=config["energy_weight"], force_weight=config["force_weight"], batch_size=config["batch_size"])
+    if config["device"] == "cuda" or config["device"] == "gpu":
+        device = "cuda"
+    else:
+        device = "cpu"
+
+    lightning_model = LightningWrapper(model, energy_weight=config["energy_weight"], force_weight=config["force_weight"], batch_size=config["batch_size"], device=device, ts=ts)
+
     print("Initialized model.")
     if "max_time" in config:
         max_time = config["max_time"]
     else:
         max_time = None
 
-    if config["device"] == "gpu":
+    if device != "cpu":
         trainer = L.Trainer(accelerator="gpu", devices=config["gpus"], max_epochs=config["max_epochs"],max_time=max_time,logger=[logger_tb, logger_csv],enable_checkpointing=True,callbacks=[PeriodicEpochCheckpoint(every=config["checkpoint_every"])])
     else:
         trainer = L.Trainer(max_epochs=config["max_epochs"], max_time=max_time,logger=[logger_tb, logger_csv],enable_checkpointing=True,deterministic=True,callbacks=[PeriodicEpochCheckpoint(every=config["checkpoint_every"])])
