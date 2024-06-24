@@ -2,6 +2,8 @@ import torch
 import numpy as np
 from torch_scatter import scatter
 
+from utils import generate_graph
+
 # class NL_model(torch.nn.Module):
 #     def __init__(self,
 #             layer_dict,
@@ -137,31 +139,90 @@ class NL_model(torch.nn.Module):
             model_config, layer_dict, energy_scaling_coeff_tensor, energy_shifting_coeff_tensor
         )
 
-    def forward(self, x, pos, edge_index, period_vec, batch):
+    # def forward(self, x, pos, edge_index, period_vec, batch, per_config_dataset_idx):
+    #     if edge_index is None:
+    #         edge_index = generate_graph(
+    #             data,
+    #             cutoff=None,
+    #             max_neighbors=None,
+    #             use_pbc=None,
+    #             otf_graph=None,
+    #             enforce_max_neighbors_strictly=None
+    #         )
+            
+    #     h = self.rep_module(x, pos, edge_index, period_vec, batch)
+    #     energies = self.out_module(h, batch)
+
+    #     batch_index = torch.arange(energies.shape[0], device=energies.device)
+    #     energies = energies[batch_index, per_config_dataset_idx]
+    #     forces = -torch.autograd.grad(
+    #         energies, pos, create_graph=True, 
+    #         grad_outputs=torch.ones_like(energies), allow_unused=True)[0] # (num_atoms, 3)
+        
+    #     # forces = []
+    #     # # compute per head forces
+    #     # for i in range(energies.shape[1]):
+    #     #     E = energies[:, i] # (num_batches)
+    #     #     F = -torch.autograd.grad(
+    #     #         E, pos, create_graph=True, 
+    #     #         grad_outputs=torch.ones_like(E), allow_unused=True)[0] # (num_atoms, 3)
+    #     #     forces.append(F)
+    #     # forces = torch.stack(forces, dim=1) # (num_atoms, num_targets, 3)
+
+    #     return energies, forces
+    
+    def forward(self, data, per_config_dataset_idx):
+        x, pos, batch = data.tags, data.pos.requires_grad_(True), data.batch
+
+        if not hasattr(data, "edge_index") or data.edge_index is None:
+            (
+                edge_index,
+                edge_dist,
+                distance_vec,
+                cell_offsets,
+                period_vec,
+                neighbors
+            ) = generate_graph(
+                data,
+                cutoff=6,
+                max_neighbors=1000,
+                use_pbc=True,
+                otf_graph=True,
+                enforce_max_neighbors_strictly=False
+            )
+        else:
+            edge_index, period_vec = data.edge_index, data.periodic_vec
+
+        # sort edge_index by the second column then the first column
+        # edge_index_np = edge_index.cpu().numpy().T
+        # edge_index_np = edge_index_np[np.lexsort((edge_index_np[:,1], edge_index_np[:,0]))].T
+        # edge_index = torch.from_numpy(edge_index_np).to(pos.device)
+
+        # if not torch.equal(edge_index[0], edge_index_new[1]) and not torch.equal(edge_index[1], edge_index_new[0]):
+        #     print(edge_index.shape, edge_index_new.shape) 
+        #     print(edge_index)
+        #     print(edge_index_new)
+        #     print("Edge index mismatch.")
+        #     raise ValueError("Edge index mismatch.")
+        # # assert torch.equal(edge_index, edge_index_new), "Edge index mismatch."
+        
         h = self.rep_module(x, pos, edge_index, period_vec, batch)
         energies = self.out_module(h, batch)
 
-        forces = []
-        # compute per head forces
-        for i in range(energies.shape[1]):
-            E = energies[:, i] # (num_batches)
-            F = -torch.autograd.grad(
-                E, pos, create_graph=True, 
-                grad_outputs=torch.ones_like(E), allow_unused=True)[0] # (num_atoms, 3)
-            forces.append(F)
-        forces = torch.stack(forces, dim=1) # (num_atoms, num_targets, 3)
+        batch_index = torch.arange(energies.shape[0], device=energies.device)
+        energies = energies[batch_index, per_config_dataset_idx]
+        forces = -torch.autograd.grad(
+            energies, pos, create_graph=True, 
+            grad_outputs=torch.ones_like(energies), allow_unused=True)[0] # (num_atoms, 3)
+        
+        # forces = []
+        # # compute per head forces
+        # for i in range(energies.shape[1]):
+        #     E = energies[:, i] # (num_batches)
+        #     F = -torch.autograd.grad(
+        #         E, pos, create_graph=True, 
+        #         grad_outputs=torch.ones_like(E), allow_unused=True)[0] # (num_atoms, 3)
+        #     forces.append(F)
+        # forces = torch.stack(forces, dim=1) # (num_atoms, num_targets, 3)
 
         return energies, forces
-    
-""" 
-Question:
-What is the way that makes sense to obtain the multi-head grad forces.
-The output multi-head energies E have the shape (num_batches, num_targets),
-To obtain forces for each head, we need to compute the gradient of each head energy with respect to the positions which requires a for loop.
-
-Any way to directly call
-F = -torch.autograd.grad(
-    E, pos, create_graph=True, grad_outputs=torch.ones_like(E))[0] to obtain (num_atoms, num_targets, 3)?
-
-Will that cause memory issue or computational bottleneck?
-"""
