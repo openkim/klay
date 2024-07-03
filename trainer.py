@@ -5,9 +5,11 @@ import numpy as np
 
 import lightning as L
 import torch
+import torch.nn.functional as F
 import torch_geometric as pyg
 from torch_scatter import scatter
 from simple_nequip import gen_model
+from utils import ocp_transform
 
 from CoRe import CoRe
 
@@ -49,6 +51,17 @@ class LightningWrapper(L.LightningModule):
             # model is a input yaml file
             self.model = gen_model(model, save=False)
         print(type(self.model))
+
+        # map dataset names to dimensions
+        self.idx2dataset = {i: dataset for i, dataset in enumerate(self.model.model_config["datasets"])}
+        self.dataset2idx = {dataset: i for i, dataset in enumerate(self.model.model_config["datasets"])}
+
+        # obtain dataset weights
+        self.dataset_weights = torch.tensor([[
+            self.model.model_config["dataset_weights"][dataset] \
+                for dataset in self.model.model_config["datasets"]
+        ]]).to(device)
+
         self.ts = ts
         self.energy_weight = energy_weight
         self.force_weight = force_weight
@@ -58,40 +71,78 @@ class LightningWrapper(L.LightningModule):
         ema = ExponentialMovingAverage(self.model.parameters(), decay=decay)
         ema.to(device)
         self.ema = ema
+        # self.device = device
 
-    def forward(self, x, pos, edge_index, periodic_vec, batch_contrib):
-        # pos.requires_grad_(True)
-        E = self.model(x, pos, edge_index, periodic_vec, batch_contrib)
-        F, = torch.autograd.grad([E], [pos], create_graph=True, grad_outputs=torch.ones_like(E))
-        return E, -F
+    def forward(self, data, per_config_dataset_idx):
+        E, F = self.model(data, per_config_dataset_idx) # (num_batches, num_targets), (num_atoms, num_targets, 3)
+        return E, F
+
+    def _task_idx_onehot(self, per_config_dataset_idx, num_targets):
+        return F.one_hot(
+            per_config_dataset_idx,
+            num_classes=num_targets,
+        ).bool()
+
+    def compute_loss(self, E, F, E_target, F_target, batch_contrib, per_config_dataset_idx, reduce_forces_on_configs=False, per_head_eval=False):
+        per_atomit_env_dataset_idx = per_config_dataset_idx[batch_contrib]
+
+        num_heads = self.dataset_weights.shape[1]
+        E_loss_total = torch.nn.functional.mse_loss(E, E_target, reduce=False) # (num_batches, 1)
+        E_loss = scatter(E_loss_total, per_config_dataset_idx, dim=0, dim_size=num_heads, reduce='mean') # (num_heads, 1)
+        
+        F_loss_total = torch.nn.functional.mse_loss(F, F_target, reduce=False).mean(dim=-1) # (num_atoms, 1)
+        if reduce_forces_on_configs:
+            F_loss_total = scatter(F_loss_total, batch_contrib, dim=0, reduce='mean') # (num_batches, 1)
+            F_loss = scatter(F_loss_total, per_config_dataset_idx, dim=0, dim_size=num_heads, reduce='mean') # (num_heads, 1)
+        else:
+            F_loss = scatter(F_loss_total, per_atomit_env_dataset_idx, dim=0, dim_size=num_heads, reduce='mean') # (num_heads, 1)
+
+        E_loss_per_head = E_loss.detach()
+        F_loss_per_head = F_loss.detach()
+
+        E_loss = E_loss @ self.dataset_weights.T
+        F_loss = F_loss @ self.dataset_weights.T
+
+        return E_loss, F_loss, E_loss_per_head, F_loss_per_head
 
     def training_step(self, batch, batch_idx):
-        x, pos, edge_index, periodic_vec, batch_contrib, E_target, F_target = batch.tags, batch.pos.requires_grad_(True), batch.edge_index, batch.periodic_vec, batch.batch, batch.y.float(), batch.force
-        E, F = self.forward(x, pos, edge_index, periodic_vec, batch_contrib)
-        loss = torch.nn.functional.mse_loss(E, E_target.view(-1,1)) * self.energy_weight 
-        loss += torch.nn.functional.mse_loss(F, F_target) * self.force_weight
-        self.log("train_loss", loss, on_epoch=True,batch_size=self.batch_size)
-        return loss
+        dataset = batch.dataset_index
+        per_config_dataset_idx = torch.LongTensor([
+            self.dataset2idx[ds] for ds in dataset]).to(self.device)
+        batch_contrib, E_target, F_target = batch.batch, batch.y.float(), batch.force
+
+        E, F = self.forward(batch, per_config_dataset_idx)
+        E_loss, F_loss, E_loss_per_head, F_loss_per_head = self.compute_loss(E, F, E_target, F_target, batch_contrib, per_config_dataset_idx, reduce_forces_on_configs=True, per_head_eval=False)
+
+        self.log("train_energy_loss", E_loss, on_epoch=True, batch_size=self.batch_size)
+        self.log("train_force_loss", F_loss, on_epoch=True, batch_size=self.batch_size)
+
+        return E_loss * self.energy_weight + F_loss * self.force_weight
 
     def validation_step(self, batch, batch_idx):
         # save as chkpoint
         torch.set_grad_enabled(True)
-        x, pos, edge_index, periodic_vec, batch_contrib, E_target, F_target = batch.tags, batch.pos.requires_grad_(True), batch.edge_index, batch.periodic_vec, batch.batch, batch.y.float(), batch.force
-        E, F = self.forward(x, pos, edge_index, periodic_vec, batch_contrib)
-        eloss = torch.nn.functional.mse_loss(E, E_target.view(-1,1)) * self.energy_weight 
-        floss = torch.nn.functional.mse_loss(F, F_target) * self.force_weight
-        self.log("val_loss", eloss + floss, on_epoch=True,batch_size=self.batch_size)
-        self.log("val_e_loss", eloss, on_epoch=True,batch_size=self.batch_size)
-        self.log("val_f_loss", floss, on_epoch=True,batch_size=self.batch_size)
+        dataset = batch.dataset_index
+        per_config_dataset_idx = torch.LongTensor([
+            self.dataset2idx[ds] for ds in dataset]).to(self.device)
+        batch_contrib, E_target, F_target = batch.batch, batch.y.float(), batch.force
+        E, F = self.forward(batch, per_config_dataset_idx)
+
+        # E_loss, F_loss, E_loss_per_head, F_loss_per_head = self.compute_loss(E, F, E_target, F_target, batch_contrib, dataset, per_head_eval=True)
+        E_loss, F_loss, E_loss_per_head, F_loss_per_head = self.compute_loss(E, F, E_target, F_target, batch_contrib, per_config_dataset_idx, reduce_forces_on_configs=True, per_head_eval=True)
+        val_loss = E_loss * self.energy_weight + F_loss * self.force_weight
+
+        self.log("val_loss", val_loss.item(), on_epoch=True, batch_size=self.batch_size)
+        self.log("val_e_loss", E_loss.item(), on_epoch=True, batch_size=self.batch_size)
+        self.log("val_f_loss", F_loss.item(), on_epoch=True, batch_size=self.batch_size)
+
+        if E_loss_per_head is not None:
+            for idx in self.idx2dataset.keys():
+                self.log(f"val_e_loss_{self.idx2dataset[idx]}", E_loss_per_head[idx], on_epoch=True, batch_size=self.batch_size)
+                self.log(f"val_f_loss_{self.idx2dataset[idx]}", F_loss_per_head[idx], on_epoch=True, batch_size=self.batch_size)
 
     def on_before_zero_grad(self, *args, **kwargs):
         self.ema.update(self.model.parameters())
-
-#    def configure_optimizers(self):
-#        self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001, amsgrad=True)
-#        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,
-#                        patience=50,factor=0.5,)
-#        return {"optimizer": self.optimizer, "lr_scheduler": {"scheduler": self.scheduler, "monitor":"val_loss"}}
 
     def configure_optimizers(self):
         self.optimizer = CoRe(self.parameters(), lr=0.001)
@@ -137,7 +188,7 @@ if __name__ == "__main__":
     indices = np.loadtxt(indices_file, dtype=int)
     train_indices = indices[:config["n_train"]]
     val_indices = indices[-config["n_val"]:]
-    dataset = PYGLoad(path=dataset_file)
+    dataset = PYGLoad(path=dataset_file, transform=ocp_transform)
     train_dataset = dataset[train_indices]
     val_dataset = dataset[val_indices]
     print(f"Loaded dataset: {dataset_file} \n Indices: {indices_file}")
@@ -166,7 +217,7 @@ if __name__ == "__main__":
     if device != "cpu":
         trainer = L.Trainer(accelerator="gpu", devices=config["gpus"], max_epochs=config["max_epochs"],max_time=max_time,logger=[logger_tb, logger_csv],enable_checkpointing=True,callbacks=[PeriodicEpochCheckpoint(every=config["checkpoint_every"])])
     else:
-        trainer = L.Trainer(max_epochs=config["max_epochs"], max_time=max_time,logger=[logger_tb, logger_csv],enable_checkpointing=True,deterministic=True,callbacks=[PeriodicEpochCheckpoint(every=config["checkpoint_every"])])
+        trainer = L.Trainer(accelerator='cpu', max_epochs=config["max_epochs"], max_time=max_time,logger=[logger_tb, logger_csv],enable_checkpointing=True,deterministic=True,callbacks=[PeriodicEpochCheckpoint(every=config["checkpoint_every"])])
     print("Starting training.")
     #trainer.fit(lightning_model, train_loader, val_loader,ckpt_path="lightning_logs/logs/TB/lightning_logs/version_1/checkpoints/epoch=9-step=10.ckpt")
     trainer.fit(lightning_model, train_loader, val_loader)

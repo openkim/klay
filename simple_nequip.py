@@ -71,15 +71,39 @@ def gen_model(yaml_file, save=True):
         last_node_irrep = conv_layer.irreps_out
 
     # final mappings
-    for i in range(config["post_conv_layers"]):
+    for i in range(config["post_conv_layers"] - 1):
         linear_post_layer = AtomwiseLinear(last_node_irrep, config["post_conv_irreps"][i])
         layer_dict[f"post_conv:{i}"] = linear_post_layer
         last_node_irrep = config["post_conv_irreps"][i]
         node_embedding_dim_list.append(last_node_irrep)
 
-    model = NL_model(layer_dict, 
-                    energy_scaling_coeff=config["scale"],
-                    energy_shifting_coeff=config["shift"])
+    final_conv_irreps = "{}x0e".format(config["num_targets"]) # config["post_conv_irreps"][-1]
+    linear_post_layer = AtomwiseLinear(last_node_irrep, final_conv_irreps)
+    layer_dict["post_conv:{}".format(config["post_conv_layers"] - 1)] = linear_post_layer
+    last_node_irrep = config["post_conv_irreps"][i]
+    node_embedding_dim_list.append(last_node_irrep)
+
+    # print(last_node_irrep)
+    # layer_dict[f"post_conv_activation"] = load_activation(config["post_conv_activation"])
+    # layer_dict[f"post_conv:0"] = torch.nn.Linear(
+    #     int(last_node_irrep.split('x')[0]), 
+    #     config["post_conv_irreps"][0] * config["num_targets"] # parallelize of output layers
+    # )
+    # last_node_irrep = config["post_conv_irreps"][0]
+    # node_embedding_dim_list.append(last_node_irrep)
+    
+    # for i in range(1, config["post_conv_layers"]):
+    #     linear_post_layer = torch.nn.Linear(last_node_irrep, config["post_conv_irreps"][i])
+    #     layer_dict[f"post_conv:{i}"] = linear_post_layer
+    #     last_node_irrep = config["post_conv_irreps"][i]
+    #     node_embedding_dim_list.append(last_node_irrep)
+
+    model = NL_model(
+        config,
+        layer_dict, 
+        energy_scaling_coeff=config["scale"],
+        energy_shifting_coeff=config["shift"]
+    )
     print(model)
     if save:
         model = jit.script(model)
