@@ -1,19 +1,19 @@
 # Files
-model_file: "../in.yaml"
-dataset_file: "../data/dataset_Si_Cubuck_full_stride_20.pt"
-indices_file: "../data/dataset_Si_Cubuck_full_stride_20_indices.txt"
+model_file: "mixture_15k.yml"
+dataset_file: "data/mixture_15k.pt"
+indices_file: "data/mixture_15k_indices.txt"
 
 # Training
-n_train: 10
-n_val: 10
+n_train: 1400
+n_val: 100
 energy_weight: 1.0
 force_weight: 10.0
 batch_size: 10
 checkpoint_every: 3
 
 # Hardware
-device: "None" # or gpu
-gpus: 0 # if above is gpu
+device: "cuda" # or gpu
+gpus: 1 # if above is gpu
 max_epochs: 20
 max_time: "1:00:00:00" # days:hours:minutes:seconds
 num_workers: 16
