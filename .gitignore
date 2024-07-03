@@ -162,3 +162,7 @@ cython_debug/
 ocp
 
 files.txt
+
+Dev/
+lightning_logs/
+manual_ckpts/
