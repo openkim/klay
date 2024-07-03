@@ -9,6 +9,7 @@ import torch.nn.functional as F
 import torch_geometric as pyg
 from torch_scatter import scatter
 from simple_nequip import gen_model
+from utils import ocp_transform
 
 from CoRe import CoRe
 
@@ -72,10 +73,6 @@ class LightningWrapper(L.LightningModule):
         self.ema = ema
         # self.device = device
 
-    # def forward(self, x, pos, edge_index, periodic_vec, batch_contrib, per_config_dataset_idx):
-    #     E, F = self.model(x, pos, edge_index, periodic_vec, batch_contrib, per_config_dataset_idx) # (num_batches, num_targets), (num_atoms, num_targets, 3)
-    #     return E, F
-
     def forward(self, data, per_config_dataset_idx):
         E, F = self.model(data, per_config_dataset_idx) # (num_batches, num_targets), (num_atoms, num_targets, 3)
         return E, F
@@ -86,96 +83,9 @@ class LightningWrapper(L.LightningModule):
             num_classes=num_targets,
         ).bool()
 
-    # def compute_loss(self, E, F, E_target, F_target, batch_contrib, dataset, reduce_forces_on_configs=False, per_head_eval=False):
-    #     num_heads = E.shape[1]
-        
-    #     per_config_dataset_idx = torch.LongTensor([
-    #         self.dataset2idx[ds] for ds in dataset]).to(E.device)
-    #     E_mask = self._task_idx_onehot(per_config_dataset_idx, num_heads) # (num_batches, num_targets)
-    #     if reduce_forces_on_configs:
-    #         F_mask = E_mask
-    #     else:
-    #         F_mask = E_mask[batch_contrib] # (num_atoms, num_targets)
-
-    #     E_target = E_target.unsqueeze(1).expand(-1, num_heads) # (num_batches, 1)
-    #     F_target = F_target.unsqueeze(1).expand(-1, num_heads, -1) # (num_atoms, 1, 3)
-
-    #     E_loss_total = torch.nn.functional.mse_loss(E, E_target, reduce=False) # (num_batches, num_targets)
-    #     F_loss_total = torch.nn.functional.mse_loss(F, F_target, reduce=False).mean(dim=-1) # (num_atoms, num_targets)
-
-    #     if reduce_forces_on_configs:
-    #         F_loss_total = scatter(F_loss_total, batch_contrib, dim=0, reduce='mean') # (num_batches, num_targets)
-
-    #     E_loss = (E_loss_total * E_mask).sum(dim=0) / (E_mask.sum(dim=0) + 1e-10)
-    #     F_loss = (F_loss_total * F_mask).sum(dim=0) / (F_mask.sum(dim=0) + 1e-10)
-
-    #     E_loss = E_loss @ self.dataset_weights.T
-    #     F_loss = F_loss @ self.dataset_weights.T
-
-    #     if per_head_eval:
-    #         E_loss_per_head = {}
-    #         F_loss_per_head = {}
-            
-    #         with torch.no_grad():
-    #             for i in range(E.shape[1]):
-    #                 E_mask_per_head = E_mask[:, i] # (num_batches)
-    #                 F_mask_per_head = F_mask[:, i]
-
-    #                 if E_mask_per_head.sum() > 0:
-    #                     E_loss_per_head[i] = E_loss_total[:, i][E_mask_per_head].mean()
-    #                     F_loss_per_head[i] = F_loss_total[:, i][F_mask_per_head].mean()
-                
-    #             return E_loss, F_loss, E_loss_per_head, F_loss_per_head
-    #     return E_loss, F_loss
-
-    # def training_step(self, batch, batch_idx):
-    #     dataset = batch.dataset_index
-    #     x, pos, edge_index, periodic_vec, batch_contrib, E_target, F_target = batch.tags, batch.pos.requires_grad_(True), batch.edge_index, batch.periodic_vec, batch.batch, batch.y.float(), batch.force
-
-    #     E, F = self.forward(x, pos, edge_index, periodic_vec, batch_contrib)
-    #     E_loss, F_loss = self.compute_loss(E, F, E_target, F_target, batch_contrib, dataset)
-
-    #     self.log("train_energy_loss", E_loss, on_epoch=True, batch_size=self.batch_size)
-    #     self.log("train_force_loss", F_loss, on_epoch=True, batch_size=self.batch_size)
-
-    #     return E_loss * self.energy_weight + F_loss * self.force_weight
-
-    # def validation_step(self, batch, batch_idx):
-    #     # save as chkpoint
-    #     torch.set_grad_enabled(True)
-    #     dataset = batch.dataset_index
-    #     x, pos, edge_index, periodic_vec, batch_contrib, E_target, F_target = batch.tags, batch.pos.requires_grad_(True), batch.edge_index, batch.periodic_vec, batch.batch, batch.y.float(), batch.force
-    #     E, F = self.forward(x, pos, edge_index, periodic_vec, batch_contrib)
-
-    #     E_loss, F_loss, E_loss_per_head, F_loss_per_head = self.compute_loss(E, F, E_target, F_target, batch_contrib, dataset, per_head_eval=True)
-    #     val_loss = E_loss * self.energy_weight + F_loss * self.force_weight
-
-    #     self.log("val_loss", val_loss.item(), on_epoch=True, batch_size=self.batch_size)
-    #     self.log("val_e_loss", E_loss.item(), on_epoch=True,batch_size=self.batch_size)
-    #     self.log("val_f_loss", F_loss.item(), on_epoch=True,batch_size=self.batch_size)
-
-    #     for idx in E_loss_per_head.keys():
-    #         self.log(f"val_e_loss_{self.idx2dataset[idx]}", E_loss_per_head[idx], on_epoch=True, batch_size=self.batch_size)
-    #         self.log(f"val_f_loss_{self.idx2dataset[idx]}", F_loss_per_head[idx], on_epoch=True, batch_size=self.batch_size)
-
     def compute_loss(self, E, F, E_target, F_target, batch_contrib, per_config_dataset_idx, reduce_forces_on_configs=False, per_head_eval=False):
-        # E_loss = torch.nn.functional.mse_loss(E, E_target)
-        # F_loss = torch.nn.functional.mse_loss(F, F_target)
-
-        # num_heads = E.shape[1]
-        
-        # per_config_dataset_idx = torch.LongTensor([
-        #     self.dataset2idx[ds] for ds in dataset]).to(E.device)
         per_atomit_env_dataset_idx = per_config_dataset_idx[batch_contrib]
 
-        # E_mask = self._task_idx_onehot(per_config_dataset_idx, num_heads) # (num_batches, num_targets)
-        # if reduce_forces_on_configs:
-        #     F_mask = E_mask
-        # else:
-        #     F_mask = E_mask[batch_contrib] # (num_atoms, num_targets)
-
-        # E_target = E_target.unsqueeze(1).expand(-1, num_heads) # (num_batches, 1)
-        # F_target = F_target.unsqueeze(1).expand(-1, num_heads, -1) # (num_atoms, 1, 3)
         num_heads = self.dataset_weights.shape[1]
         E_loss_total = torch.nn.functional.mse_loss(E, E_target, reduce=False) # (num_batches, 1)
         E_loss = scatter(E_loss_total, per_config_dataset_idx, dim=0, dim_size=num_heads, reduce='mean') # (num_heads, 1)
@@ -187,37 +97,22 @@ class LightningWrapper(L.LightningModule):
         else:
             F_loss = scatter(F_loss_total, per_atomit_env_dataset_idx, dim=0, dim_size=num_heads, reduce='mean') # (num_heads, 1)
 
-        # E_loss = (E_loss_total * E_mask).sum(dim=0) / (E_mask.sum(dim=0) + 1e-10)
-        # F_loss = (F_loss_total * F_mask).sum(dim=0) / (F_mask.sum(dim=0) + 1e-10)
+        E_loss_per_head = E_loss.detach()
+        F_loss_per_head = F_loss.detach()
 
         E_loss = E_loss @ self.dataset_weights.T
         F_loss = F_loss @ self.dataset_weights.T
 
-        # if per_head_eval:
-        #     E_loss_per_head = {}
-        #     F_loss_per_head = {}
-            
-        #     with torch.no_grad():
-        #         for i in range(E.shape[1]):
-        #             E_mask_per_head = E_mask[:, i] # (num_batches)
-        #             F_mask_per_head = F_mask[:, i]
-
-        #             if E_mask_per_head.sum() > 0:
-        #                 E_loss_per_head[i] = E_loss_total[:, i][E_mask_per_head].mean()
-        #                 F_loss_per_head[i] = F_loss_total[:, i][F_mask_per_head].mean()
-                
-        #         return E_loss, F_loss, E_loss_per_head, F_loss_per_head
-        return E_loss, F_loss
+        return E_loss, F_loss, E_loss_per_head, F_loss_per_head
 
     def training_step(self, batch, batch_idx):
         dataset = batch.dataset_index
         per_config_dataset_idx = torch.LongTensor([
             self.dataset2idx[ds] for ds in dataset]).to(self.device)
-        # x, pos, edge_index, periodic_vec, batch_contrib, E_target, F_target = batch.tags, batch.pos.requires_grad_(True), batch.edge_index, batch.periodic_vec, batch.batch, batch.y.float(), batch.force
         batch_contrib, E_target, F_target = batch.batch, batch.y.float(), batch.force
 
         E, F = self.forward(batch, per_config_dataset_idx)
-        E_loss, F_loss = self.compute_loss(E, F, E_target, F_target, batch_contrib, per_config_dataset_idx, reduce_forces_on_configs=True, per_head_eval=False)
+        E_loss, F_loss, E_loss_per_head, F_loss_per_head = self.compute_loss(E, F, E_target, F_target, batch_contrib, per_config_dataset_idx, reduce_forces_on_configs=True, per_head_eval=False)
 
         self.log("train_energy_loss", E_loss, on_epoch=True, batch_size=self.batch_size)
         self.log("train_force_loss", F_loss, on_epoch=True, batch_size=self.batch_size)
@@ -230,21 +125,21 @@ class LightningWrapper(L.LightningModule):
         dataset = batch.dataset_index
         per_config_dataset_idx = torch.LongTensor([
             self.dataset2idx[ds] for ds in dataset]).to(self.device)
-        # x, pos, edge_index, periodic_vec, batch_contrib, E_target, F_target = batch.tags, batch.pos.requires_grad_(True), batch.edge_index, batch.periodic_vec, batch.batch, batch.y.float(), batch.force
         batch_contrib, E_target, F_target = batch.batch, batch.y.float(), batch.force
         E, F = self.forward(batch, per_config_dataset_idx)
 
         # E_loss, F_loss, E_loss_per_head, F_loss_per_head = self.compute_loss(E, F, E_target, F_target, batch_contrib, dataset, per_head_eval=True)
-        E_loss, F_loss = self.compute_loss(E, F, E_target, F_target, batch_contrib, per_config_dataset_idx, reduce_forces_on_configs=True, per_head_eval=True)
+        E_loss, F_loss, E_loss_per_head, F_loss_per_head = self.compute_loss(E, F, E_target, F_target, batch_contrib, per_config_dataset_idx, reduce_forces_on_configs=True, per_head_eval=True)
         val_loss = E_loss * self.energy_weight + F_loss * self.force_weight
 
         self.log("val_loss", val_loss.item(), on_epoch=True, batch_size=self.batch_size)
-        self.log("val_e_loss", E_loss.item(), on_epoch=True,batch_size=self.batch_size)
-        self.log("val_f_loss", F_loss.item(), on_epoch=True,batch_size=self.batch_size)
+        self.log("val_e_loss", E_loss.item(), on_epoch=True, batch_size=self.batch_size)
+        self.log("val_f_loss", F_loss.item(), on_epoch=True, batch_size=self.batch_size)
 
-        # for idx in E_loss_per_head.keys():
-        #     self.log(f"val_e_loss_{self.idx2dataset[idx]}", E_loss_per_head[idx], on_epoch=True, batch_size=self.batch_size)
-        #     self.log(f"val_f_loss_{self.idx2dataset[idx]}", F_loss_per_head[idx], on_epoch=True, batch_size=self.batch_size)
+        if E_loss_per_head is not None:
+            for idx in self.idx2dataset.keys():
+                self.log(f"val_e_loss_{self.idx2dataset[idx]}", E_loss_per_head[idx], on_epoch=True, batch_size=self.batch_size)
+                self.log(f"val_f_loss_{self.idx2dataset[idx]}", F_loss_per_head[idx], on_epoch=True, batch_size=self.batch_size)
 
     def on_before_zero_grad(self, *args, **kwargs):
         self.ema.update(self.model.parameters())
@@ -293,7 +188,7 @@ if __name__ == "__main__":
     indices = np.loadtxt(indices_file, dtype=int)
     train_indices = indices[:config["n_train"]]
     val_indices = indices[-config["n_val"]:]
-    dataset = PYGLoad(path=dataset_file)
+    dataset = PYGLoad(path=dataset_file, transform=ocp_transform)
     train_dataset = dataset[train_indices]
     val_dataset = dataset[val_indices]
     print(f"Loaded dataset: {dataset_file} \n Indices: {indices_file}")

@@ -449,3 +449,25 @@ def generate_graph(
         cell_offset_distances,
         neighbors,
     )
+
+def ocp_transform(data):
+    (
+        edge_index,
+        edge_dist,
+        distance_vec,
+        cell_offsets,
+        period_vec,
+        neighbors
+    ) = generate_graph(
+        data,
+        cutoff=6,
+        max_neighbors=1000,
+        use_pbc=True,
+        otf_graph=True,
+        enforce_max_neighbors_strictly=False
+    )
+
+    data.edge_index = edge_index
+    data.periodic_vec = period_vec
+    
+    return data
