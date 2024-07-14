@@ -1,15 +1,12 @@
 average_num_neigh: 16.65625
-conv_feature_size: 32
+conv_feature_size: 16
 dataset_weights:
-  ani: 0.3333333333333333
-  mptraj: 0.3333333333333333
-  oc20: 0.3333333333333333
+  mptraj: 0.5
+  oc20: 0.5
 datasets:
 - oc20
-- ani
 - mptraj
 elements:
-- n
 - H
 - He
 - Li
@@ -111,7 +108,7 @@ elements:
 - Es
 - Fm
 - Md
-- 'No'
+- No
 - Lr
 - Rf
 - Db
@@ -128,8 +125,9 @@ elements:
 - Lv
 - Ts
 - Og
-lmax: 3
-model_name: Si_NEQUIP_EF_Cubuck
+
+lmax: 2
+model_name: MP_OC_mixture
 n_conv_layers: 3
 n_radial_basis: 8
 nonlinearity_gates:
@@ -139,7 +137,7 @@ nonlinearity_scalars:
   e: silu
   o: tanh
 nonlinearity_type: gate
-num_targets: 3
+num_targets: 2
 p: 6
 parity: true
 post_conv_activation: silu
@@ -147,20 +145,18 @@ post_conv_irreps:
 - 16x0e
 - 1x0e
 post_conv_layers: 2
-r_max: 6.0
-radial_network_hidden_dim: 64
+r_max: 8.5
+radial_network_hidden_dim: 32
 radial_network_layers: 2
 scale:
-  ani: 2.932092627684592
-  mptraj: 7.692328060648377
-  oc20: 2.816759039140648
+  mptraj: 1.0
+  oc20: 1.0
 scaling:
 - energy: 1.0
 - force: 1.0
 shift:
-  ani: -0.03420529699871258
-  mptraj: 0.43323472238500865
-  oc20: -0.8190475001500014
+  mptraj: 0.0
+  oc20:  0.0
 shifting:
 - energy: 0.0
 - force: 0.0
