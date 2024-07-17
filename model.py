@@ -17,7 +17,7 @@ class NL_model(torch.nn.Module):
         self.register_buffer("energy_shifting_coeff", torch.tensor(energy_shifting_coeff))
 
 
-    def forward(self, x, pos, edge_index, period_vec, batch):
+    def forward(self, x, pos, edge_index, shifts, batch):
         # elem/node embedding
         x_attr = self.node_attr_layer(x.long().squeeze(-1))
         x_attr = x_attr.to(dtype=pos.dtype)
@@ -25,7 +25,7 @@ class NL_model(torch.nn.Module):
         h = self.node_embedding_layer(x_attr)
 
         # Edge embedding
-        edge_vec, edge_lengths, edge_sh = self.edge_attr_layer(pos, edge_index, period_vec)
+        edge_vec, edge_lengths, edge_sh = self.edge_attr_layer(pos, edge_index, shifts)
 
         # Radial basis function
         edge_length_embedding = self.edge_embedding_layer(edge_lengths)
@@ -38,12 +38,13 @@ class NL_model(torch.nn.Module):
         for layer in self.post_conv_layers:
             h = layer(h)
 
+
         h = h.squeeze()
         # energies, forces = h[:,0], h[:,1:4]
         # reduce energies per batch
-        h = scatter(h, batch, dim=0)
-        energies = h * self.energy_scaling_coeff + self.energy_shifting_coeff 
-        energies = energies.unsqueeze(-1)
-        return energies
+        # h = scatter(h, batch, dim=0)
+        # energies = h * self.energy_scaling_coeff + self.energy_shifting_coeff 
+        # energies = energies.unsqueeze(-1)
+        return h
 
 
