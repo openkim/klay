@@ -17,14 +17,12 @@ class OneHotAtomEncoding(torch.nn.Module):
     def __init__(
         self,
         num_elems: int,
-        irreps_in=None,
     ):
         super().__init__()
         self.num_elems = num_elems
         # Output irreps are num_elems even (invariant) scalars
-        self.irreps_in = irreps_in
         self.irreps_out = Irreps([(self.num_elems, (0, 1))])
 
     def forward(self, x): #TODO input data type
-        one_hot = torch.nn.functional.one_hot(x, num_classes=self.num_elems)
+        one_hot = torch.nn.functional.one_hot(x - 1, num_classes=self.num_elems)
         return one_hot

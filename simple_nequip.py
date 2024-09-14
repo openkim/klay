@@ -1,4 +1,5 @@
 import torch
+torch.set_default_dtype(torch.float32)
 from e3nn.o3 import Irreps
 from e3nn.util import jit
 from layers import embedding as e

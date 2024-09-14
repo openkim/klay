@@ -1,5 +1,5 @@
-Call: 
-```
-from simple_nequip import gen_model
-model = gen_model("in.yaml")
-```
+# KLAY - KLIFF Layers
+
+KLIFF compatible ML layers you can mould to your needs. Usable for general neural network architectures as well.
+
+
