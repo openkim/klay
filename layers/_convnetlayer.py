@@ -1,6 +1,5 @@
-from typing import Dict, Callable
+from typing import Dict, Callable, List
 import torch
-import logging
 
 from e3nn import o3
 from e3nn.nn import Gate, NormActivation
@@ -156,4 +155,25 @@ class ConvNetLayer(torch.nn.Module):
         # do resnet
         if self.resnet:
             h = old_h + h
+        return h
+
+
+class NequipConvBlock(torch.nn.Module):
+    """
+    Args:
+
+    """
+
+    def __init__(
+        self,
+        n_layers: int,
+        conv_layers: List[ConvNetLayer],
+    ):
+        super().__init__()
+        self.n_layers = n_layers
+        self.conv_layers = torch.nn.ModuleList(conv_layers)
+
+    def forward(self, x, h, edge_length_embeddings, edge_sh, edge_index):
+        for layer in self.conv_layers:
+            h = layer(x, h, edge_length_embeddings, edge_sh, edge_index)
         return h
