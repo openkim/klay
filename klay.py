@@ -71,7 +71,6 @@ def get_layers_block():
     print("   - edge_embedding_irrep: edge embedding irreps")
 
 
-
 class ElemEmbedding(Enum):
     """ """
 
@@ -272,7 +271,6 @@ def get_model_from_yaml(yaml_file):
     """
     with open(yaml_file, "r") as f:
         config = yaml.safe_load(f)
-    print(config)
     layers_list = config["model"]
 
     layers = []
@@ -317,4 +315,12 @@ def get_model_from_yaml(yaml_file):
                 raise ValueError(f"Unknown layer type: {layer_type}")
 
     model = torch.nn.Sequential(*layers)
+
+    trainable_parameters = 0
+    for p in model.parameters():
+        if p.requires_grad:
+            trainable_parameters += p.numel()
+    print("---------------------------------------------------------")
+    print(f"Generated model with {trainable_parameters} parameters")
+    print("---------------------------------------------------------")
     return model

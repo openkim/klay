@@ -47,11 +47,10 @@ class InteractionBlock(torch.nn.Module):
         :param use_sc: bool, use self-connection or not
         """
         super().__init__()
-        my_irreps_in= o3.Irreps([(edge_embedding_irreps.num_irreps,(0, 1),)])
-
+        irreps_in = o3.Irreps(irreps_in)
+        irreps_out = o3.Irreps(irreps_out)
         self.avg_num_neighbors = avg_num_neighbors
         self.use_sc = use_sc
-        print("irreps_in", irreps_in, "irreps_out", irreps_out)
         feature_irreps_in = irreps_in
         feature_irreps_out = irreps_out
         irreps_edge_attr = edge_attr_irreps
@@ -67,7 +66,6 @@ class InteractionBlock(torch.nn.Module):
         irreps_mid = []
         instructions = []
 
-        print("feature_irreps_in", feature_irreps_in)
         for i, (mul, ir_in) in enumerate(feature_irreps_in):
             for j, (_, ir_edge) in enumerate(irreps_edge_attr):
                 for ir_out in ir_in * ir_edge:
