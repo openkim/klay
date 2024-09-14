@@ -227,6 +227,8 @@ def get_nequip_conv_block(
 def get_model_from_yaml(yaml_file):
     """ 
     Generate model sequentially from yaml file. Ordering in YAML file is important. Order of layers is important.
+    Under the model block, the layers are defined as a list of dictionaries. Each dictionary contains the layer type and its parameters.
+
     Example yaml file:
     model:
         - elem_embedding:
@@ -239,7 +241,7 @@ def get_model_from_yaml(yaml_file):
             normalization: component
             parity: True
         
-        - radial_basis:
+        radial_basis:
             r_max: 5.0
             num_basis: 8
             trainable: True
@@ -270,40 +272,49 @@ def get_model_from_yaml(yaml_file):
     """
     with open(yaml_file, "r") as f:
         config = yaml.safe_load(f)
-    layers_dict = config["model"]
-    layers_types = list(layers_dict.keys())
+    print(config)
+    layers_list = config["model"]
 
     layers = []
-    for layer in layers_types:
-        if layer == "elem_embedding":
-            elem_embed = layers_dict[layer]
-            layers.append(get_element_embedding(**elem_embed))
-            elem_embed["irreps_out"] = layers[-1].irreps_out
-        elif layer == "edge_embedding":
-            edge_embed = layers_dict[layer]
-            layers.append(get_edge_embedding(**edge_embed))
-            edge_embed["irreps_out"] = layers[-1].irreps_out
-        elif layer == "radial_basis":
-            radial_basis = layers_dict[layer]
-            layers.append(get_radial_basis(**radial_basis))
-            radial_basis["irreps_out"] = layers[-1].irreps_out
-        elif layer == "linear_e3nn":
-            linear_e3nn = layers_dict[layer]
-            if linear_e3nn["irreps_in"] == "DETECT_PREV":
-                linear_e3nn["irreps_in"] = layers[-1].irreps_out
-            layers.append(get_linear_e3nn(**linear_e3nn))
-        elif layer == "nequip_conv_block":
-            nequip_conv_block = layers_dict[layer]
-            if nequip_conv_block["node_embedding_irrep_in"] == "DETECT_PREV":
-                nequip_conv_block["node_embedding_irrep_in"] = layers[-1].irreps_out
-            if nequip_conv_block["node_attr_irrep"] == "DETECT_PREV":
-                nequip_conv_block["node_attr_irrep"] = layers_dict["elem_embedding"]["irreps_out"]
-            if nequip_conv_block["edge_embedding_irrep"] == "DETECT_PREV":
-                nequip_conv_block["edge_embedding_irrep"] = layers_dict["radial_basis"]["irreps_out"]
-            if nequip_conv_block["edge_attr_irrep"] == "DETECT_PREV":
-                nequip_conv_block["edge_attr_irrep"] = layers_dict["edge_embedding"]["irreps_out"]
-            layers.append(get_nequip_conv_block(**nequip_conv_block))
-        else:
-            raise ValueError(f"Unknown layer type: {layer}")
-        model = torch.nn.Sequential(*layers)
+    node_attr_irrep = None
+    edge_attr_irrep = None
+    edge_length_embedding_irrep = None
+
+    for layer_dict in layers_list:
+        for layer_type, layer_params in layer_dict.items():
+            if layer_type == "elem_embedding":
+                elem_embed = layer_params
+                layers.append(get_element_embedding(**elem_embed))
+                elem_embed["irreps_out"] = layers[-1].irreps_out
+                node_attr_irrep = layers[-1].irreps_out
+            elif layer_type == "edge_embedding":
+                edge_embed = layer_params
+                layers.append(get_edge_embedding(**edge_embed))
+                edge_embed["irreps_out"] = layers[-1].irreps_out
+                edge_attr_irrep = layers[-1].irreps_out
+            elif layer_type == "radial_basis":
+                radial_basis = layer_params
+                layers.append(get_radial_basis(**radial_basis))
+                radial_basis["irreps_out"] = layers[-1].irreps_out
+                edge_length_embedding_irrep = layers[-1].irreps_out
+            elif layer_type == "linear_e3nn":
+                if layer_params["irreps_in"] == "DETECT_PREV":
+                    layer_params["irreps_in"] = layers[-1].irreps_out
+                linear_e3nn = layer_params
+                layers.append(get_linear_e3nn(**linear_e3nn))
+            elif layer_type == "nequip_conv_block":
+                nequip_conv_block = layer_params
+                if nequip_conv_block["node_embedding_irrep_in"] == "DETECT_PREV":
+                    nequip_conv_block["node_embedding_irrep_in"] = layers[-1].irreps_out
+                if nequip_conv_block["node_attr_irrep"] == "DETECT_PREV":
+                    nequip_conv_block["node_attr_irrep"] = node_attr_irrep
+                if nequip_conv_block["edge_embedding_irrep"] == "DETECT_PREV":
+                    nequip_conv_block["edge_embedding_irrep"] = edge_length_embedding_irrep
+                if nequip_conv_block["edge_attr_irrep"] == "DETECT_PREV":
+                    nequip_conv_block["edge_attr_irrep"] = edge_attr_irrep
+                layers.append(get_nequip_conv_block(**nequip_conv_block))
+            else:
+                raise ValueError(f"Unknown layer type: {layer_type}")
+
+    model = torch.nn.Sequential(*layers)
     return model

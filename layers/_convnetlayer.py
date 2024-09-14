@@ -132,6 +132,12 @@ class ConvNetLayer(torch.nn.Module):
             self.resnet = False
 
         # override defaults for irreps:
+        print("irreps_in", self.irreps_in)
+        print("conv_irreps_out", conv_irreps_out)
+        print("node_attr_irreps", node_attr_irreps)
+        print("edge_attr_irreps", edge_attr_irreps)
+        print("edge_embedding_irreps", edge_embedding_irreps)
+        print("convolution_kwargs", convolution_kwargs)
         self.conv = InteractionBlock(
             irreps_in=self.irreps_in,
             irreps_out=conv_irreps_out,
@@ -172,6 +178,7 @@ class NequipConvBlock(torch.nn.Module):
         super().__init__()
         self.n_layers = n_layers
         self.conv_layers = torch.nn.ModuleList(conv_layers)
+        self.irreps_out = self.conv_layers[-1].irreps_out
 
     def forward(self, x, h, edge_length_embeddings, edge_sh, edge_index):
         for layer in self.conv_layers:
