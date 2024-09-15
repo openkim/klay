@@ -1,7 +1,7 @@
 Usage
 =====
 
-Easiest way to use is to use the function :func:`klay.get_model_from_yaml` to get the layer you want. You need to provide a yaml file with block titled `model`. Model block should have list of layer configs for each layer. The :func:`klay.get_model_from_yaml` function will assemble the layers in sequential order and return the model. You can use the ``DETECT_PREV`` keyword in certain blocks to dynamically use the ouutput of previous layer. For example, in the following yaml file, ``linear_e3nn`` layer will use the output ``radial_basis`` layer as input.
+Easiest way to use is to use the function :func:`klay.get_model_layers_from_yaml` to get the layers you want. You need to provide a yaml file with block titled `model`. Model block should have list of layer configs for each layer. The :func:`klay.get_model_layers_from_yaml` function will return a list of layers in sequential order. You can use the ``DETECT_PREV`` keyword in certain blocks to dynamically use the ouutput of previous layer. For example, in the following yaml file, ``linear_e3nn`` layer will use the output ``radial_basis`` layer as input.
 
 .. code-block:: yaml
 
@@ -44,20 +44,19 @@ Easiest way to use is to use the function :func:`klay.get_model_from_yaml` to ge
             irreps_in: DETECT_PREV
             irreps_out: 1x1e
 
-Should return a nequip model with following configuration:
+Should return 6 nequip model layers with following configuration:
 
 .. code-block:: python
 
-    from klay import get_model_from_yaml
-    model = get_model_from_yaml('model.yaml')
+    from klay import get_model_layers_from_yaml
+    model = get_model_layers_from_yaml('model.yaml')
     print(model)
 
 .. code-block:: text
 
     ---------------------------------------------------------
-    Generated model with 21912 parameters
+    Generated layers with 21912 parameters
     ---------------------------------------------------------
-    Sequential(
     (0): OneHotAtomEncoding()
     (1): SphericalHarmonicEdgeAttrs(
         (sh): SphericalHarmonics()
@@ -98,4 +97,39 @@ Should return a nequip model with following configuration:
     )
     )
 
-You can see the example in `examples` folder for more details.
+You can see the example in `examples` folder for more details. You can now use these layers in your model. Below is an example of how to use these layers in a model.
+
+.. code-block:: python
+
+    import torch
+    from klay import get_model_layers_from_yaml
+
+    layers = get_model_layers_from_yaml('model.yaml')
+    
+    class Model(torch.nn.Module):
+        def __init__(self, layers):
+            super(Model, self).__init__()
+            self.layers = torch.nn.ModuleList(layers)
+
+        def forward(self, z, pos, edge_index, shifts):
+            node_attr = self.layers[0](z)
+            edge_vec, edge_length, edge_sh = self.layers[1](pos, edge_index, shifts)
+            edge_embedding = self.layers[2](edge_length)
+            node_embedding = self.layers[3](node_attr)
+            node_embedding = self.layers[4](node_attr, node_embedding, edge_embedding, edge_sh, edge_index)
+            node_embedding = self.layers[5](node_embedding)
+            return node_embedding
+
+    model = Model(layers)
+
+    # Example input
+    z = torch.randn(10, 5)
+    pos = torch.randn(10, 3)
+    edge_index = torch.tensor([[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [1, 2, 3, 4, 5, 6, 7, 8, 9, 0]])
+    shifts = torch.randn(10, 3)
+
+    # Forward pass
+    out = model(z, pos, edge_index, shifts)
+    print(out)
+
+This gives the flexibility to generate arbitrary layers and assemble them like LEGO blocks.

@@ -24,7 +24,8 @@ class Layers(Enum):
     LINEAR_E3NN = 3
     NEQUIP_CONV = 4
     NEQUIP_CONV_BLOCK = 5
-    # EGNN_CONV = 5        
+    # EGNN_CONV = 5
+
 
 def summary():
     """
@@ -36,13 +37,19 @@ def summary():
     print("   - n_elems: number of elements <only for one_hot>")
     print(" - edge_embedding: for getting edge embeddings")
     print("   - lmax: maximum l value for spherical harmonics")
-    print("   - normalize: whether to normalize the spherical harmonics <optional, def: True>")
-    print("   - normalization: normalization scheme to use <optional, def: component>")
+    print(
+        "   - normalize: whether to normalize the spherical harmonics <optional, def: True>"
+    )
+    print(
+        "   - normalization: normalization scheme to use <optional, def: component>"
+    )
     print("   - parity: whether to use parity <optional, def: True>")
     print(" - radial_basis: for getting radial basis")
     print("   - r_max: cutoff radius")
     print("   - num_basis: number of basis functions <optional, def: 8>")
-    print("   - trainable: whether the basis functions are trainable <optional, def: True>")
+    print(
+        "   - trainable: whether the basis functions are trainable <optional, def: True>"
+    )
     print("   - power: power used in envelope function <optional, def: 6>")
     print(" - linear_e3nn: for getting linear e3nn")
     print("   - irreps_in: input irreps")
@@ -58,10 +65,18 @@ def summary():
     print("   - avg_neigh: average number of neighbors <optional, def: 1>")
     print("   - nonlinearity_type: nonlinearity type <optional, def: gate>")
     print("   - resnet: whether to use resnet <optional, def: False>")
-    print("   - nonlinearity_scalars: nonlinearity scalars <optional, def: {e: ssp, o: tanh}>")
-    print("   - nonlinearity_gates: nonlinearity gates <optional, def: {e: ssp, o: abs}>")
-    print("   - radial_network_hidden_dim: radial network hidden dimension <optional, def: 64>")
-    print("   - radial_network_layers: radial network layers <optional, def: 2>")
+    print(
+        "   - nonlinearity_scalars: nonlinearity scalars <optional, def: {e: ssp, o: tanh}>"
+    )
+    print(
+        "   - nonlinearity_gates: nonlinearity gates <optional, def: {e: ssp, o: abs}>"
+    )
+    print(
+        "   - radial_network_hidden_dim: radial network hidden dimension <optional, def: 64>"
+    )
+    print(
+        "   - radial_network_layers: radial network layers <optional, def: 2>"
+    )
     print(" -------------------------------------------------------------")
     print(" Better is to use the NequIPConvBlock for multiple conv layers")
     print(" - nequip_conv_block: for getting nequip conv block")
@@ -79,7 +94,7 @@ class ElemEmbedding(Enum):
     """
     Supported element embedding types.
     1. ONE_HOT: One hot encoding, with n_elems as number of elements
-    2. BINARY: Binary encoding, 8 bits for atomic number, no n_elems required 
+    2. BINARY: Binary encoding, 8 bits for atomic number, no n_elems required
     3. ELECTRON: Electron state encoding, no n_elems required. length of repr : 24
     """
 
@@ -108,7 +123,9 @@ class ElemEmbedding(Enum):
             raise ValueError(f"Unknown element embedding type: {embed_str}")
 
 
-def get_element_embedding(embedding_type:str, n_elems:int =118) -> torch.nn.Module:
+def get_element_embedding(
+    embedding_type: str, n_elems: int = 118
+) -> torch.nn.Module:
     """
     Get torch module for element embedding.
 
@@ -131,7 +148,10 @@ def get_element_embedding(embedding_type:str, n_elems:int =118) -> torch.nn.Modu
 
 
 def get_edge_embedding(
-    lmax: int, normalize:bool =True, normalization:str ="component", parity:bool =True
+    lmax: int,
+    normalize: bool = True,
+    normalization: str = "component",
+    parity: bool = True,
 ) -> torch.nn.Module:
     """
     Returns edge embedding module. Edge embedding return spherical harmonics for the edge vectors with total length being (lmax + 1) * (lmax + 1).
@@ -141,7 +161,7 @@ def get_edge_embedding(
         normalize (bool): whether to normalize the spherical harmonics <optional, def: True>
         normalization (str): normalization scheme to use <optional, def: component>
         parity (bool): whether to use parity <optional, def: True>
-    
+
     Returns:
         torch.nn.Module: edge embedding module
     """
@@ -155,7 +175,12 @@ def get_edge_embedding(
     )
 
 
-def get_radial_basis(r_max: Union[float, torch.Tensor], num_basis:int=8, trainable:bool=True, power:int=6) -> torch.nn.Module:
+def get_radial_basis(
+    r_max: Union[float, torch.Tensor],
+    num_basis: int = 8,
+    trainable: bool = True,
+    power: int = 6,
+) -> torch.nn.Module:
     """
     Returns radial basis module. Radial basis module returns the radial Bessel basis functions for the edge lengths.
 
@@ -164,7 +189,7 @@ def get_radial_basis(r_max: Union[float, torch.Tensor], num_basis:int=8, trainab
         num_basis (int): number of basis functions <optional, def: 8>
         trainable (bool): whether the basis functions are trainable <optional, def: True>
         power (int): power used in envelope function <optional, def: 6>
-    
+
     Returns:
         torch.nn.Module: radial basis module
     """
@@ -209,7 +234,7 @@ def get_nequip_conv(
     radial_network_hidden_dim=64,
     radial_network_layers=2,
 ) -> torch.nn.Module:
-    """ 
+    """
     Get NequIP convolution layer.
 
     Args:
@@ -260,21 +285,21 @@ def get_nequip_conv(
 
 
 def get_nequip_conv_block(
-        n_conv_layers: int,
-        parity: bool,
-        lmax: int,
-        conv_feature_size: int,
-        node_embedding_irrep_in,
-        node_attr_irrep,
-        edge_attr_irrep,
-        edge_embedding_irrep,
-        avg_neigh=1,
-        nonlinearity_type="gate",
-        resnet=False,
-        nonlinearity_scalars={"e": "ssp", "o": "tanh"},
-        nonlinearity_gates={"e": "ssp", "o": "abs"},
-        radial_network_hidden_dim=64,
-        radial_network_layers=2,
+    n_conv_layers: int,
+    parity: bool,
+    lmax: int,
+    conv_feature_size: int,
+    node_embedding_irrep_in,
+    node_attr_irrep,
+    edge_attr_irrep,
+    edge_embedding_irrep,
+    avg_neigh=1,
+    nonlinearity_type="gate",
+    resnet=False,
+    nonlinearity_scalars={"e": "ssp", "o": "tanh"},
+    nonlinearity_gates={"e": "ssp", "o": "abs"},
+    radial_network_hidden_dim=64,
+    radial_network_layers=2,
 ) -> torch.nn.Module:
     """
     Returns NequIP convolution block, with multiple convolution layers.
@@ -323,10 +348,16 @@ def get_nequip_conv_block(
     return NequipConvBlock(n_conv_layers, layers)
 
 
-def get_model_from_yaml(yaml_file):
-    """ 
+def get_model_layers_from_yaml(yaml_file):
+    """
     Generate model sequentially from yaml file. Ordering in YAML file is important. Order of layers is important.
     Under the model block, the layers are defined as a list of dictionaries. Each dictionary contains the layer type and its parameters.
+
+    Here the expected inputs to the model are:
+    1. atomic numbers: torch.int64 tensor of shape (n_atoms,)
+    2. positions: default tensor type of shape (n_atoms, 3)
+    3. edge_indices: torch.int64 tensor of shape (n_edges, 2)
+    4. shifts: default tensor type of shape (n_edges, 3) (actual vectors = positions[edge_indices[:, 1]] - positions[edge_indices[:, 0]] - shifts)
 
     Example yaml file:
     model:
@@ -339,17 +370,17 @@ def get_model_from_yaml(yaml_file):
             normalize: True
             normalization: component
             parity: True
-        
+
         - radial_basis:
             r_max: 5.0
             num_basis: 8
             trainable: True
             power: 6
-        
+
         - linear_e3nn:
             irreps_in: DETECT_PREV
             irreps_out: 32x0e
-        
+
         - nequip_conv_block:
             n_conv_layers: 3
             parity: True
@@ -363,7 +394,7 @@ def get_model_from_yaml(yaml_file):
             resnet: True
             radial_network_hidden_dim: 64
             radial_network_layers: 2
-        
+
         - linear_e3nn:
             irreps_in: DETECT_PREV
             irreps_out: 1x0e
@@ -407,12 +438,19 @@ def get_model_from_yaml(yaml_file):
                 layers.append(get_linear_e3nn(**linear_e3nn))
             elif layer_type == "nequip_conv_block":
                 nequip_conv_block = layer_params
-                if nequip_conv_block["node_embedding_irrep_in"] == "DETECT_PREV":
-                    nequip_conv_block["node_embedding_irrep_in"] = layers[-1].irreps_out
+                if (
+                    nequip_conv_block["node_embedding_irrep_in"]
+                    == "DETECT_PREV"
+                ):
+                    nequip_conv_block["node_embedding_irrep_in"] = layers[
+                        -1
+                    ].irreps_out
                 if nequip_conv_block["node_attr_irrep"] == "DETECT_PREV":
                     nequip_conv_block["node_attr_irrep"] = node_attr_irrep
                 if nequip_conv_block["edge_embedding_irrep"] == "DETECT_PREV":
-                    nequip_conv_block["edge_embedding_irrep"] = edge_length_embedding_irrep
+                    nequip_conv_block[
+                        "edge_embedding_irrep"
+                    ] = edge_length_embedding_irrep
                 if nequip_conv_block["edge_attr_irrep"] == "DETECT_PREV":
                     nequip_conv_block["edge_attr_irrep"] = edge_attr_irrep
                 layers.append(get_nequip_conv_block(**nequip_conv_block))
@@ -426,6 +464,6 @@ def get_model_from_yaml(yaml_file):
         if p.requires_grad:
             trainable_parameters += p.numel()
     print("---------------------------------------------------------")
-    print(f"Generated model with {trainable_parameters} parameters")
+    print(f"Generated layers with {trainable_parameters} parameters")
     print("---------------------------------------------------------")
-    return model
+    return layers
