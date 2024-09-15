@@ -17,13 +17,13 @@ model:
     
     - linear_e3nn:
         irreps_in: DETECT_PREV
-        irreps_out: 32x0e
+        irreps_out: 16x0e
     
     - nequip_conv_block:
-        n_conv_layers: 3
+        n_conv_layers: 2
         parity: True
         lmax: 1
-        conv_feature_size: 32
+        conv_feature_size: 16
         node_embedding_irrep_in: DETECT_PREV
         node_attr_irrep: DETECT_PREV
         edge_attr_irrep: DETECT_PREV
@@ -33,10 +33,6 @@ model:
         radial_network_hidden_dim: 64
         radial_network_layers: 2
     
-    - linear_e3nn:
-        irreps_in: DETECT_PREV
-        irreps_out: 16x0e + 16x1o
-
     - linear_e3nn:
         irreps_in: DETECT_PREV
         irreps_out: 1x1o

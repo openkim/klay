@@ -1,0 +1,7 @@
+# Documentation
+sphinx
+
+# Project dependencies
+torch
+e3nn
+PyYAML
