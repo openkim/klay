@@ -2,9 +2,9 @@ from typing import Union
 import torch
 from e3nn.o3 import Irreps
 from e3nn.util import jit
-from layers import embedding as e
-from layers import AtomwiseLinear
-from layers import ConvNetLayer, NequipConvBlock
+from .layers import embedding as e
+from .layers import AtomwiseLinear
+from .layers import ConvNetLayer, NequipConvBlock
 
 import yaml
 import sys
@@ -140,9 +140,9 @@ def get_element_embedding(
     if embedding_type_enum == ElemEmbedding.ONE_HOT:
         return e.OneHotAtomEncoding(n_elems)
     elif embedding_type_enum == ElemEmbedding.BINARY:
-        return e.BinaryAtomEncoding()
+        return e.BinaryAtomicNumberEncoding()
     elif embedding_type_enum == ElemEmbedding.ELECTRON:
-        return e.ElectronAtomEncoding()
+        return e.ElectronicConfigurationEncoding()
     else:
         raise ValueError(f"Unknown element embedding type: {embedding_type}")
 

@@ -134,9 +134,8 @@ class ElectronicConfigurationEncoding(torch.nn.Module):
                                 [115, 2, 2, 6, 2, 6, 10, 2, 6, 10, 2, 6, 14, 10, 2, 6, 14, 10, 2, 3, 2, 3, 10, 14],
                                 [116, 2, 2, 6, 2, 6, 10, 2, 6, 10, 2, 6, 14, 10, 2, 6, 14, 10, 2, 4, 2, 4, 10, 14],
                                 [117, 2, 2, 6, 2, 6, 10, 2, 6, 10, 2, 6, 14, 10, 2, 6, 14, 10, 2, 5, 2, 5, 10, 14],
-                                [118, 2, 2, 6, 2, 6, 10, 2, 6, 10, 2, 6, 14, 10, 2, 6, 14, 10, 2, 6, 2, 6, 10, 14]])
-        e_config = torch.tensor(e_config, dtype=torch.int32)
-        self.electronic_config = self.register_buffer(e_config)
+                                [118, 2, 2, 6, 2, 6, 10, 2, 6, 10, 2, 6, 14, 10, 2, 6, 14, 10, 2, 6, 2, 6, 10, 14]], dtype=torch.float32)
+        self.electronic_config = self.register_buffer("e_config",e_config)
 
     def forward(self, x):
         representation =  self.electronic_config[x - 1].to(x.dtype).to(x.device)
