@@ -5,6 +5,7 @@ from e3nn.util import jit
 from .layers import embedding as e
 from .layers import AtomwiseLinear
 from .layers import ConvNetLayer, NequipConvBlock
+from .layers.egnn import EGCL
 
 import yaml
 import sys
@@ -24,7 +25,9 @@ class Layers(Enum):
     LINEAR_E3NN = 3
     NEQUIP_CONV = 4
     NEQUIP_CONV_BLOCK = 5
-    # EGNN_CONV = 5
+    EGNN_CONV = 5
+    TORCH_NN = 6
+    TORCH_FUNC = 7
 
 
 def summary():
@@ -348,6 +351,18 @@ def get_nequip_conv_block(
     return NequipConvBlock(n_conv_layers, layers)
 
 
+def get_egnn_conv(in_node_fl, hidden_node_fl, edge_fl=0, act_fn=torch.nn.SiLU(), n_hidden_layers=1, normalize_radial=False):
+    return EGCL(in_node_fl, hidden_node_fl, edge_fl, act_fn, n_hidden_layers, normalize_radial)
+
+
+def get_torch_nn_layer(layer_type, layer_params):
+    return getattr(torch.nn, layer_type)(**layer_params)
+
+
+def get_torch_func_layer(func_name):
+    return getattr(torch.nn.functional, func_name)
+
+
 def get_model_layers_from_yaml(yaml_file):
     """
     Generate model sequentially from yaml file. Ordering in YAML file is important. Order of layers is important.
@@ -454,15 +469,30 @@ def get_model_layers_from_yaml(yaml_file):
                 if nequip_conv_block["edge_attr_irrep"] == "DETECT_PREV":
                     nequip_conv_block["edge_attr_irrep"] = edge_attr_irrep
                 layers.append(get_nequip_conv_block(**nequip_conv_block))
+
+            elif layer_type == "egnn_conv":
+                egnn_conv = layer_params
+                layers.append(get_egnn_conv(**egnn_conv))
+            elif layer_type == "torch_nn":
+                torch_nn = layer_params["name"]
+                params = layer_params["kwargs"]
+
+                layers.append(get_torch_nn_layer(torch_nn, params))
+            elif layer_type == "torch_func":
+                torch_func = layer_params["name"]
+                layers.append(get_torch_func_layer(torch_func))
+
             else:
                 raise ValueError(f"Unknown layer type: {layer_type}")
 
-    model = torch.nn.Sequential(*layers)
 
     trainable_parameters = 0
-    for p in model.parameters():
-        if p.requires_grad:
-            trainable_parameters += p.numel()
+    for layer in layers:
+        try:
+            trainable_parameters += sum(p.numel() for p in layer.parameters() if p.requires_grad)
+        except AttributeError:
+            pass
+
     print("---------------------------------------------------------")
     print(f"Generated layers with {trainable_parameters} parameters")
     print("---------------------------------------------------------")

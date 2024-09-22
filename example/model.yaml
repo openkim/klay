@@ -36,3 +36,16 @@ model:
     - linear_e3nn:
         irreps_in: DETECT_PREV
         irreps_out: 1x1o
+
+    - torch_nn:
+        name: Linear
+        kwargs:
+            in_features: 10
+            out_features: 10
+    - torch_func:
+        name: silu
+
+    - egnn_conv:
+        in_node_fl: 10
+        hidden_node_fl: 10
+        edge_fl: 10
