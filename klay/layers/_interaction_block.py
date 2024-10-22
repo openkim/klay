@@ -31,7 +31,7 @@ class InteractionBlock(torch.nn.Module):
         invariant_neurons=8,
         avg_num_neighbors=None,
         use_sc=True,
-        nonlinearity_scalars: Dict[int, Callable] = {"e": "ssp"},
+        nonlinearity_scalars: Dict[int, Callable] = {"e": "silu"},
     ) -> None:
         """
         InteractionBlock.

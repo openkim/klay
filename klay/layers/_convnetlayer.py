@@ -47,8 +47,8 @@ class ConvNetLayer(torch.nn.Module):
         convolution_kwargs: dict = {},
         resnet: bool = False,
         nonlinearity_type: str = "gate",
-        nonlinearity_scalars: Dict[int, Callable] = {"e": "ssp", "o": "tanh"},
-        nonlinearity_gates: Dict[int, Callable] = {"e": "ssp", "o": "abs"},
+        nonlinearity_scalars: Dict[int, Callable] = {"e": "silu", "o": "tanh"},
+        nonlinearity_gates: Dict[int, Callable] = {"e": "silu", "o": "abs"},
     ):
         super().__init__()
         # initialization
@@ -98,6 +98,7 @@ class ConvNetLayer(torch.nn.Module):
 
             # TO DO, it's not that safe to directly use the
             # dictionary
+            print(">>>", irreps_scalars, nonlinearity_scalars)
             equivariant_nonlin = Gate(
                 irreps_scalars=irreps_scalars,
                 act_scalars=[

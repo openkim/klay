@@ -1,8 +1,4 @@
 model:
-    - elem_embedding:
-        embedding_type: one_hot
-        n_elems: 1
-
     - edge_embedding:
         lmax: 1
         normalize: True
@@ -15,6 +11,9 @@ model:
         trainable: True
         power: 6
     
+    - elem_embedding:
+        embedding_type: electron
+
     - linear_e3nn:
         irreps_in: DETECT_PREV
         irreps_out: 16x0e
@@ -30,22 +29,9 @@ model:
         edge_embedding_irrep: DETECT_PREV
         avg_neigh: 1
         resnet: True
-        radial_network_hidden_dim: 64
+        radial_network_hidden_dim: 32
         radial_network_layers: 2
     
     - linear_e3nn:
         irreps_in: DETECT_PREV
-        irreps_out: 1x1o
-
-    - torch_nn:
-        name: Linear
-        kwargs:
-            in_features: 10
-            out_features: 10
-    - torch_func:
-        name: silu
-
-    - egnn_conv:
-        in_node_fl: 10
-        hidden_node_fl: 10
-        edge_fl: 10
+        irreps_out: 1x0e + 1x1o

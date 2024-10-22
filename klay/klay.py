@@ -232,8 +232,8 @@ def get_nequip_conv(
     avg_neigh=1,
     nonlinearity_type="gate",
     resnet=False,
-    nonlinearity_scalars={"e": "ssp", "o": "tanh"},
-    nonlinearity_gates={"e": "ssp", "o": "abs"},
+    nonlinearity_scalars={"e": "silu", "o": "tanh"},
+    nonlinearity_gates={"e": "silu", "o": "abs"},
     radial_network_hidden_dim=64,
     radial_network_layers=2,
 ) -> torch.nn.Module:
@@ -299,8 +299,8 @@ def get_nequip_conv_block(
     avg_neigh=1,
     nonlinearity_type="gate",
     resnet=False,
-    nonlinearity_scalars={"e": "ssp", "o": "tanh"},
-    nonlinearity_gates={"e": "ssp", "o": "abs"},
+    nonlinearity_scalars={"e": "silu", "o": "tanh"},
+    nonlinearity_gates={"e": "silu", "o": "abs"},
     radial_network_hidden_dim=64,
     radial_network_layers=2,
 ) -> torch.nn.Module:
