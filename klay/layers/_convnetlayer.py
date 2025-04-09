@@ -3,23 +3,10 @@ import torch
 
 from e3nn import o3
 from e3nn.nn import Gate, NormActivation
-import math
 from . import InteractionBlock
+from ._non_linear import ShiftedSoftPlus
+from ..utils import tp_path_exists
 
-def tp_path_exists(irreps_in1, irreps_in2, ir_out):
-    irreps_in1 = o3.Irreps(irreps_in1).simplify()
-    irreps_in2 = o3.Irreps(irreps_in2).simplify()
-    ir_out = o3.Irrep(ir_out)
-
-    for _, ir1 in irreps_in1:
-        for _, ir2 in irreps_in2:
-            if ir_out in ir1 * ir2:
-                return True
-    return False
-
-#@torch.jit.script # removing scripting to avoid the Nan bug
-def ShiftedSoftPlus(x):
-    return torch.nn.functional.softplus(x) - math.log(2.0)
 
 acts = {
     "abs": torch.abs,
@@ -98,7 +85,6 @@ class ConvNetLayer(torch.nn.Module):
 
             # TO DO, it's not that safe to directly use the
             # dictionary
-            print(">>>", irreps_scalars, nonlinearity_scalars)
             equivariant_nonlin = Gate(
                 irreps_scalars=irreps_scalars,
                 act_scalars=[
@@ -159,23 +145,3 @@ class ConvNetLayer(torch.nn.Module):
         return h
 
 
-class NequipConvBlock(torch.nn.Module):
-    """
-    Args:
-
-    """
-
-    def __init__(
-        self,
-        n_layers: int,
-        conv_layers: List[ConvNetLayer],
-    ):
-        super().__init__()
-        self.n_layers = n_layers
-        self.conv_layers = torch.nn.ModuleList(conv_layers)
-        self.irreps_out = self.conv_layers[-1].irreps_out
-
-    def forward(self, x, h, edge_length_embeddings, edge_sh, edge_index):
-        for layer in self.conv_layers:
-            h = layer(x, h, edge_length_embeddings, edge_sh, edge_index)
-        return h

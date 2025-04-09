@@ -4,30 +4,10 @@ from e3nn.o3 import Irreps
 from e3nn.util import jit
 from .layers import embedding as e
 from .layers import AtomwiseLinear
-from .layers import ConvNetLayer, NequipConvBlock
 from .layers.egnn import EGCL
 
 import yaml
 import sys
-
-
-from enum import Enum
-
-
-class Layers(Enum):
-    """
-    Supported layers types
-    """
-
-    ELEM_EMBEDDING = 0
-    EDGE_EMBEDDING = 1
-    RADIAL_BASIS = 2
-    LINEAR_E3NN = 3
-    NEQUIP_CONV = 4
-    NEQUIP_CONV_BLOCK = 5
-    EGNN_CONV = 5
-    TORCH_NN = 6
-    TORCH_FUNC = 7
 
 
 def summary():
@@ -93,39 +73,6 @@ def summary():
     print("   - edge_embedding_irrep: edge embedding irreps")
 
 
-class ElemEmbedding(Enum):
-    """
-    Supported element embedding types.
-    1. ONE_HOT: One hot encoding, with n_elems as number of elements
-    2. BINARY: Binary encoding, 8 bits for atomic number, no n_elems required
-    3. ELECTRON: Electron state encoding, no n_elems required. length of repr : 24
-    """
-
-    ONE_HOT = 0
-    BINARY = 1
-    ELECTRON = 2
-
-    @staticmethod
-    def get_embed_type_from_str(embed_str: str) -> "ElemEmbedding":
-        """
-        Get element embedding type from string.
-
-        Args:
-            embed_str (str): element embedding type
-
-        Returns:
-            ElemEmbedding: element embedding type enum
-        """
-        if embed_str.lower() == "one_hot":
-            return ElemEmbedding.ONE_HOT
-        elif embed_str.lower() == "binary":
-            return ElemEmbedding.BINARY
-        elif embed_str.lower() == "electron":
-            return ElemEmbedding.ELECTRON
-        else:
-            raise ValueError(f"Unknown element embedding type: {embed_str}")
-
-
 def get_element_embedding(
     embedding_type: str, n_elems: int = 118
 ) -> torch.nn.Module:
@@ -139,15 +86,16 @@ def get_element_embedding(
     Returns:
         torch.nn.Module: element embedding module
     """
-    embedding_type_enum = ElemEmbedding.get_embed_type_from_str(embedding_type)
-    if embedding_type_enum == ElemEmbedding.ONE_HOT:
-        return e.OneHotAtomEncoding(n_elems)
-    elif embedding_type_enum == ElemEmbedding.BINARY:
-        return e.BinaryAtomicNumberEncoding()
-    elif embedding_type_enum == ElemEmbedding.ELECTRON:
-        return e.ElectronicConfigurationEncoding()
-    else:
-        raise ValueError(f"Unknown element embedding type: {embedding_type}")
+    pass
+    # embedding_type_enum = ElemEmbedding.get_embed_type_from_str(embedding_type)
+    # if embedding_type_enum == ElemEmbedding.ONE_HOT:
+    #     return e.OneHotAtomEncoding(n_elems)
+    # elif embedding_type_enum == ElemEmbedding.BINARY:
+    #     return e.BinaryAtomicNumberEncoding()
+    # elif embedding_type_enum == ElemEmbedding.ELECTRON:
+    #     return e.ElectronicConfigurationEncoding()
+    # else:
+    #     raise ValueError(f"Unknown element embedding type: {embedding_type}")
 
 
 def get_edge_embedding(
@@ -220,135 +168,6 @@ def get_linear_e3nn(irreps_in, irreps_out) -> torch.nn.Module:
     """
     return AtomwiseLinear(irreps_in, irreps_out)
 
-
-def get_nequip_conv(
-    parity: bool,
-    lmax: int,
-    conv_feature_size: int,
-    node_embedding_irrep_in,
-    node_attr_irrep,
-    edge_attr_irrep,
-    edge_embedding_irrep,
-    avg_neigh=1,
-    nonlinearity_type="gate",
-    resnet=False,
-    nonlinearity_scalars={"e": "silu", "o": "tanh"},
-    nonlinearity_gates={"e": "silu", "o": "abs"},
-    radial_network_hidden_dim=64,
-    radial_network_layers=2,
-) -> torch.nn.Module:
-    """
-    Get NequIP convolution layer.
-
-    Args:
-        parity (bool): whether to use parity
-        lmax (int): maximum l value for spherical harmonics
-        conv_feature_size (int): convolution feature size
-        node_embedding_irrep_in: input node embedding irreps
-        node_attr_irrep: node attribute irreps
-        edge_attr_irrep: edge attribute irreps
-        edge_embedding_irrep: edge embedding irreps
-        avg_neigh (int): average number of neighbors <optional, def: 1>
-        nonlinearity_type (str): nonlinearity type <optional, def: gate>
-        resnet (bool): whether to use resnet <optional, def: False>
-        nonlinearity_scalars (dict): nonlinearity scalars <optional, def: {e: ssp, o: tanh}>
-        nonlinearity_gates (dict): nonlinearity gates <optional, def: {e: ssp, o: abs}>
-        radial_network_hidden_dim (int): radial network hidden dimension <optional, def: 64>
-        radial_network_layers (int): radial network layers <optional, def: 2>
-
-    Returns:
-        torch.nn.Module: NequIP convolution layer
-    """
-    conv_hidden_irrep = Irreps(
-        [
-            (conv_feature_size, (l, p))
-            for p in ((1, -1) if parity else (1,))
-            for l in range(lmax + 1)
-        ]
-    )
-    conv_kw = {
-        "invariant_layers": radial_network_layers,
-        "invariant_neurons": radial_network_hidden_dim,
-        "avg_num_neighbors": avg_neigh,
-    }
-
-    conv_layer = ConvNetLayer(
-        node_embedding_irrep_in,
-        conv_hidden_irrep,
-        node_attr_irrep,
-        edge_attr_irrep,
-        edge_embedding_irrep,
-        convolution_kwargs=conv_kw,
-        resnet=resnet,
-        nonlinearity_type=nonlinearity_type,
-        nonlinearity_scalars=nonlinearity_scalars,
-        nonlinearity_gates=nonlinearity_gates,
-    )
-    return conv_layer
-
-
-def get_nequip_conv_block(
-    n_conv_layers: int,
-    parity: bool,
-    lmax: int,
-    conv_feature_size: int,
-    node_embedding_irrep_in,
-    node_attr_irrep,
-    edge_attr_irrep,
-    edge_embedding_irrep,
-    avg_neigh=1,
-    nonlinearity_type="gate",
-    resnet=False,
-    nonlinearity_scalars={"e": "silu", "o": "tanh"},
-    nonlinearity_gates={"e": "silu", "o": "abs"},
-    radial_network_hidden_dim=64,
-    radial_network_layers=2,
-) -> torch.nn.Module:
-    """
-    Returns NequIP convolution block, with multiple convolution layers.
-
-    Args:
-        n_conv_layers (int): number of conv layers
-        parity (bool): whether to use parity
-        lmax (int): maximum l value for spherical harmonics
-        conv_feature_size (int): convolution feature size
-        node_embedding_irrep_in: input node embedding irreps
-        node_attr_irrep: node attribute irreps
-        edge_attr_irrep: edge attribute irreps
-        edge_embedding_irrep: edge embedding irreps
-        avg_neigh (int): average number of neighbors <optional, def: 1>
-        nonlinearity_type (str): nonlinearity type <optional, def: gate>
-        resnet (bool): whether to use resnet <optional, def: False>
-        nonlinearity_scalars (dict): nonlinearity scalars <optional, def: {e: ssp, o: tanh}>
-        nonlinearity_gates (dict): nonlinearity gates <optional, def: {e: ssp, o: abs}>
-        radial_network_hidden_dim (int): radial network hidden dimension <optional, def: 64>
-        radial_network_layers (int): radial network layers <optional, def: 2>
-
-    Returns:
-        torch.nn.Module: NequIP convolution block
-    """
-    layers = []
-    last_node_irrep = node_embedding_irrep_in
-    for i in range(n_conv_layers):
-        conv_layer = get_nequip_conv(
-            parity=parity,
-            lmax=lmax,
-            conv_feature_size=conv_feature_size,
-            node_embedding_irrep_in=last_node_irrep,
-            node_attr_irrep=node_attr_irrep,
-            edge_attr_irrep=edge_attr_irrep,
-            edge_embedding_irrep=edge_embedding_irrep,
-            avg_neigh=avg_neigh,
-            nonlinearity_type=nonlinearity_type,
-            resnet=resnet,
-            nonlinearity_scalars=nonlinearity_scalars,
-            nonlinearity_gates=nonlinearity_gates,
-            radial_network_hidden_dim=radial_network_hidden_dim,
-            radial_network_layers=radial_network_layers,
-        )
-        layers.append(conv_layer)
-        last_node_irrep = conv_layer.irreps_out
-    return NequipConvBlock(n_conv_layers, layers)
 
 
 def get_egnn_conv(in_node_fl, hidden_node_fl, edge_fl=0, act_fn=torch.nn.SiLU(), n_hidden_layers=1, normalize_radial=False):
@@ -468,7 +287,7 @@ def get_model_layers_from_yaml(yaml_file):
                     ] = edge_length_embedding_irrep
                 if nequip_conv_block["edge_attr_irrep"] == "DETECT_PREV":
                     nequip_conv_block["edge_attr_irrep"] = edge_attr_irrep
-                layers.append(get_nequip_conv_block(**nequip_conv_block))
+                # layers.append(get_nequip_conv_block(**nequip_conv_block))
 
             elif layer_type == "egnn_conv":
                 egnn_conv = layer_params

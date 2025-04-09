@@ -8,13 +8,9 @@ from torch_runstats.scatter import scatter
 from e3nn import o3
 from e3nn.nn import FullyConnectedNet
 from e3nn.o3 import TensorProduct, Linear, FullyConnectedTensorProduct
-import math
-
+from ._non_linear import ShiftedSoftPlus
 
 #@torch.jit.script
-def ShiftedSoftPlus(x):
-    return torch.nn.functional.softplus(x) - math.log(2.0)
-
 
 class InteractionBlock(torch.nn.Module):
     avg_num_neighbors: Optional[float]
