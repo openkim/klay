@@ -6,6 +6,9 @@ from .layers import embedding as e
 from .layers import AtomwiseLinear
 from .layers.egnn import EGCL
 
+from .layer_types import *
+from .utils import *
+
 import yaml
 import sys
 
@@ -74,7 +77,7 @@ def summary():
 
 
 def get_element_embedding(
-    embedding_type: str, n_elems: int = 118
+        embedding_type: str, n_elems: int = 118
 ) -> torch.nn.Module:
     """
     Get torch module for element embedding.
@@ -86,23 +89,21 @@ def get_element_embedding(
     Returns:
         torch.nn.Module: element embedding module
     """
-    pass
-    # embedding_type_enum = ElemEmbedding.get_embed_type_from_str(embedding_type)
-    # if embedding_type_enum == ElemEmbedding.ONE_HOT:
-    #     return e.OneHotAtomEncoding(n_elems)
-    # elif embedding_type_enum == ElemEmbedding.BINARY:
-    #     return e.BinaryAtomicNumberEncoding()
-    # elif embedding_type_enum == ElemEmbedding.ELECTRON:
-    #     return e.ElectronicConfigurationEncoding()
-    # else:
-    #     raise ValueError(f"Unknown element embedding type: {embedding_type}")
+    if embedding_type.lower() == ElemEmbedding.ONE_HOT:
+        return e.OneHotAtomEncoding(n_elems)
+    elif embedding_type.lower() == ElemEmbedding.BINARY:
+        return e.BinaryAtomicNumberEncoding()
+    elif embedding_type.lower() == ElemEmbedding.ELECTRON:
+        return e.ElectronicConfigurationEncoding()
+    else:
+        raise ValueError(f"Unknown element embedding type: {embedding_type}")
 
 
 def get_edge_embedding(
-    lmax: int,
-    normalize: bool = True,
-    normalization: str = "component",
-    parity: bool = True,
+        lmax: int,
+        normalize: bool = True,
+        normalization: str = "component",
+        parity: bool = True,
 ) -> torch.nn.Module:
     """
     Returns edge embedding module. Edge embedding return spherical harmonics for the edge vectors with total length being (lmax + 1) * (lmax + 1).
@@ -120,17 +121,17 @@ def get_edge_embedding(
         p = -1
     else:
         p = 1
-    irreps = Irreps([(1, (l, p**l)) for l in range(lmax + 1)])
+    irreps = Irreps([(1, (l, p ** l)) for l in range(lmax + 1)])
     return e.SphericalHarmonicEdgeAttrs(
         irreps, edge_sh_normalize=normalize, edge_sh_normalization=normalization
     )
 
 
 def get_radial_basis(
-    r_max: Union[float, torch.Tensor],
-    num_basis: int = 8,
-    trainable: bool = True,
-    power: int = 6,
+        r_max: Union[float, torch.Tensor],
+        num_basis: int = 8,
+        trainable: bool = True,
+        power: int = 6,
 ) -> torch.nn.Module:
     """
     Returns radial basis module. Radial basis module returns the radial Bessel basis functions for the edge lengths.
@@ -169,9 +170,10 @@ def get_linear_e3nn(irreps_in, irreps_out) -> torch.nn.Module:
     return AtomwiseLinear(irreps_in, irreps_out)
 
 
-
-def get_egnn_conv(in_node_fl, hidden_node_fl, edge_fl=0, act_fn=torch.nn.SiLU(), n_hidden_layers=1, normalize_radial=False):
-    return EGCL(in_node_fl, hidden_node_fl, edge_fl, act_fn, n_hidden_layers, normalize_radial)
+def get_egnn_conv(in_node_fl, hidden_node_fl, edge_fl=0, act_fn=torch.nn.SiLU(),
+                  n_hidden_layers=1, normalize_radial=False):
+    return EGCL(in_node_fl, hidden_node_fl, edge_fl, act_fn, n_hidden_layers,
+                normalize_radial)
 
 
 def get_torch_nn_layer(layer_type, layer_params):
@@ -273,8 +275,8 @@ def get_model_layers_from_yaml(yaml_file):
             elif layer_type == "nequip_conv_block":
                 nequip_conv_block = layer_params
                 if (
-                    nequip_conv_block["node_embedding_irrep_in"]
-                    == "DETECT_PREV"
+                        nequip_conv_block["node_embedding_irrep_in"]
+                        == "DETECT_PREV"
                 ):
                     nequip_conv_block["node_embedding_irrep_in"] = layers[
                         -1
@@ -287,7 +289,7 @@ def get_model_layers_from_yaml(yaml_file):
                     ] = edge_length_embedding_irrep
                 if nequip_conv_block["edge_attr_irrep"] == "DETECT_PREV":
                     nequip_conv_block["edge_attr_irrep"] = edge_attr_irrep
-                # layers.append(get_nequip_conv_block(**nequip_conv_block))
+                layers.append(get_nequip_conv_block(**nequip_conv_block))
 
             elif layer_type == "egnn_conv":
                 egnn_conv = layer_params
@@ -304,11 +306,11 @@ def get_model_layers_from_yaml(yaml_file):
             else:
                 raise ValueError(f"Unknown layer type: {layer_type}")
 
-
     trainable_parameters = 0
     for layer in layers:
         try:
-            trainable_parameters += sum(p.numel() for p in layer.parameters() if p.requires_grad)
+            trainable_parameters += sum(
+                p.numel() for p in layer.parameters() if p.requires_grad)
         except AttributeError:
             pass
 

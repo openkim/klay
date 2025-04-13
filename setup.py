@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='KLAY',
-    version='0.6.2',
+    version='0.7.0',
     author='Amit Gupta',
     author_email='gupta839@umn.edu', 
     description='A Python package for generating ML layers for MLIPs',
@@ -20,6 +20,7 @@ setup(
         'torch',
         'torch_runstats',
         'e3nn',
+        'pyyaml',
     ],
     include_package_data=True,  # Include non-code files listed in MANIFEST.in
 )
