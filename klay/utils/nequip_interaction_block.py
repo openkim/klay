@@ -1,7 +1,6 @@
 import torch
 from e3nn.o3 import Irreps
 
-from ..layers._convnetlayer import ConvNetLayer
 import re
 
 from typing import List
@@ -11,7 +10,7 @@ class NequipConvBlock(torch.nn.Module):
     def __init__(
         self,
         n_layers: int,
-        conv_layers: List[ConvNetLayer],
+        conv_layers: List["ConvNetLayer"],
     ):
         super().__init__()
         self.n_layers = n_layers
@@ -66,6 +65,8 @@ def get_nequip_conv(
     Returns:
         torch.nn.Module: NequIP convolution layer
     """
+    from ..layers._convnetlayer import ConvNetLayer
+
     conv_hidden_irrep = Irreps(
         [
             (conv_feature_size, (l, p))
@@ -110,7 +111,7 @@ def get_nequip_conv_block(
         nonlinearity_gates: dict = {"e": "silu", "o": "abs"},
         radial_network_hidden_dim=64,
         radial_network_layers=2,
-        graph_type="staged"  # "mic"
+        graph_type="mic"  # "mic/staged"
 ) -> torch.nn.Module:
     """
     Returns NequIP convolution block, with multiple convolution layers.
@@ -198,7 +199,6 @@ def get_nequip_conv_block(
         raise ValueError(f"Unknown graph type {graph_type}")
 
     local_scope = {}
-    print(nequip_model_str)
     exec(nequip_model_str, globals(), local_scope)
     NequipConvBlock = local_scope["NequipConvBlock"]
     conv_block = NequipConvBlock(

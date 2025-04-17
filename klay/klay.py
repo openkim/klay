@@ -89,11 +89,11 @@ def get_element_embedding(
     Returns:
         torch.nn.Module: element embedding module
     """
-    if embedding_type.lower() == ElemEmbedding.ONE_HOT:
+    if embedding_type.lower() == ElemEmbedding.ONE_HOT.value:
         return e.OneHotAtomEncoding(n_elems)
-    elif embedding_type.lower() == ElemEmbedding.BINARY:
+    elif embedding_type.lower() == ElemEmbedding.BINARY.value:
         return e.BinaryAtomicNumberEncoding()
-    elif embedding_type.lower() == ElemEmbedding.ELECTRON:
+    elif embedding_type.lower() == ElemEmbedding.ELECTRON.value:
         return e.ElectronicConfigurationEncoding()
     else:
         raise ValueError(f"Unknown element embedding type: {embedding_type}")
