@@ -40,7 +40,7 @@ class SphericalHarmonicEdgeAttrs(torch.nn.Module):
         )
 
     def forward(self, pos, edge_index, shift):
-        edge_vec = pos[edge_index[1]] - pos[edge_index[0]]
+        edge_vec = pos[edge_index[1]] - pos[edge_index[0]] # 0 -> 1
         edge_vec = edge_vec - shift
         edge_length = torch.linalg.norm(edge_vec, dim=1)
         edge_sh = self.sh(edge_vec)
