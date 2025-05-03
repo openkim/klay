@@ -2,39 +2,6 @@ from typing import Any, Dict, List, Set
 
 import networkx as nx
 
-from klay.registry import get as get_layer
-from klay.registry import names as layer_names
-
-
-def validate_graph(spec):
-    names = []
-    g = nx.DiGraph()
-
-    for idx, l in enumerate(spec["layers"]):
-        lname = l.get("name", f'{l["type"]}_{idx}')
-        if lname in names:
-            raise ValueError(f"duplicate layer name '{lname}'")
-        names.append(lname)
-        g.add_node(lname)
-
-        # inputs default to previous layer
-        inputs = l.get("inputs") or ([names[-2]] if idx else [])
-        for src in inputs:
-            if src not in names[:-1]:
-                raise ValueError(f"layers[{idx}] refers to unknown input '{src}'")
-            g.add_edge(src, lname)
-
-    if not nx.is_directed_acyclic_graph(g):
-        raise ValueError("cycle detected in layer graph")
-
-    return g  # return the DiGraph for builder use
-
-
-# klay/spec/validate.py
-from typing import Any, Dict, List, Set
-
-import networkx as nx
-
 from klay.registry import names as layer_names
 
 
