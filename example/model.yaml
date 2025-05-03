@@ -4,20 +4,20 @@ model:
         normalize: True
         normalization: component
         parity: True
-    
+
     - radial_basis:
         r_max: 5.0
         num_basis: 8
         trainable: True
         power: 6
-    
+
     - elem_embedding:
         embedding_type: electron
 
     - linear_e3nn:
         irreps_in: DETECT_PREV
         irreps_out: 16x0e
-    
+
     - nequip_conv_block:
         n_conv_layers: 2
         parity: True
@@ -31,7 +31,7 @@ model:
         resnet: True
         radial_network_hidden_dim: 32
         radial_network_layers: 2
-    
+
     - linear_e3nn:
         irreps_in: DETECT_PREV
         irreps_out: 1x0e + 1x1o

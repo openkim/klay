@@ -15,17 +15,17 @@ Easiest way to use is to use the function :func:`klay.get_model_layers_from_yaml
             normalize: True
             normalization: component
             parity: True
-        
+
         - radial_basis:
             r_max: 5.0
             num_basis: 8
             trainable: True
             power: 1
-        
+
         - linear_e3nn:
             irreps_in: DETECT_PREV
             irreps_out: 16x0e
-        
+
         - nequip_conv_block:
             n_conv_layers: 2
             parity: True
@@ -39,7 +39,7 @@ Easiest way to use is to use the function :func:`klay.get_model_layers_from_yaml
             resnet: True
             radial_network_hidden_dim: 64
             radial_network_layers: 2
-        
+
         - linear_e3nn:
             irreps_in: DETECT_PREV
             irreps_out: 1x1e
@@ -105,7 +105,7 @@ You can see the example in `examples` folder for more details. You can now use t
     from klay import get_model_layers_from_yaml
 
     layers = get_model_layers_from_yaml('model.yaml')
-    
+
     class Model(torch.nn.Module):
         def __init__(self, layers):
             super(Model, self).__init__()

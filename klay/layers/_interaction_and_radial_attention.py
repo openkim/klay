@@ -1,16 +1,24 @@
-""" Interaction Block """
-from typing import Optional, Dict, Callable
+"""Interaction Block"""
+
+import math
+from typing import Callable, Dict, Optional
 
 import torch
-
-from torch_runstats.scatter import scatter
-
 from e3nn import o3
 from e3nn.nn import FullyConnectedNet
-from e3nn.o3 import TensorProduct, Linear, FullyConnectedTensorProduct
-import math
+from e3nn.o3 import FullyConnectedTensorProduct, Linear, TensorProduct
+from torch_runstats.scatter import scatter
+
+from ..registry import ModuleCategory, register
 from ._non_linear import ShiftedSoftPlus
 
+
+@register(
+    "AttentionInteractionBlock",
+    inputs=["x", "h", "edge_length_embeddings", "edge_sh", "edge_index", "r_ijs"],
+    outputs=["h"],
+    category=ModuleCategory.ATTENTION,
+)
 class AttentionInteractionBlock(torch.nn.Module):
     avg_num_neighbors: Optional[float]
     use_sc: bool
@@ -122,8 +130,7 @@ class AttentionInteractionBlock(torch.nn.Module):
             )
         self.irreps_out = feature_irreps_out
 
-        self.radial_attention = RadialAttention(n_input=8, n_hidden_layers=2, hidden_layer_width=8) 
-
+        self.radial_attention = RadialAttention(n_input=8, n_hidden_layers=2, hidden_layer_width=8)
 
     def forward(self, x, h, edge_length_embeddings, edge_sh, edge_index, r_ijs):
         weight = self.fc(edge_length_embeddings)
@@ -147,27 +154,41 @@ class AttentionInteractionBlock(torch.nn.Module):
         return h
 
 
+@register(
+    "RadialAttention", inputs=["r_ijs"], outputs=["attention"], category=ModuleCategory.ATTENTION
+)
 class RadialAttention(torch.nn.Module):
     """
-    Scalar radial attention mechanism. 
+    Scalar radial attention mechanism.
     TODO: Equivariant attention?
     """
-    def __init__(self, n_input: int, n_hidden_layers: int, hidden_layer_width: int, nonlinearity: str = "silu"):
+
+    def __init__(
+        self,
+        n_input: int,
+        n_hidden_layers: int,
+        hidden_layer_width: int,
+        nonlinearity: str = "silu",
+    ):
         super().__init__()
         self.n_input = n_input
-        self.register_buffer("n", torch.arange(1, n_input + 1, dtype=torch.float32) * math.pi) 
+        self.register_buffer("n", torch.arange(1, n_input + 1, dtype=torch.float32) * math.pi)
         nn_layers = []
         nn_layers.append(torch.nn.Linear(n_input, hidden_layer_width))
-        nn_layers.append({
-            "silu": torch.nn.functional.silu,
-            "ssp": ShiftedSoftPlus,
-        }[nonlinearity]())
-        for i in range(n_hidden_layers):
-            nn_layers.append(torch.nn.Linear(hidden_layer_width, hidden_layer_width))
-            nn_layers.append({
+        nn_layers.append(
+            {
                 "silu": torch.nn.functional.silu,
                 "ssp": ShiftedSoftPlus,
-            }[nonlinearity]())
+            }[nonlinearity]()
+        )
+        for i in range(n_hidden_layers):
+            nn_layers.append(torch.nn.Linear(hidden_layer_width, hidden_layer_width))
+            nn_layers.append(
+                {
+                    "silu": torch.nn.functional.silu,
+                    "ssp": ShiftedSoftPlus,
+                }[nonlinearity]()
+            )
         nn_layers.append(torch.nn.Linear(hidden_layer_width, 1))
         self.nn = torch.nn.Sequential(*nn_layers)
 

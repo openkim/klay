@@ -1,9 +1,8 @@
+import re
+from typing import List
+
 import torch
 from e3nn.o3 import Irreps
-
-import re
-
-from typing import List
 
 NEQUIP_BLOCK = """
 class NequipConvBlock(torch.nn.Module):
@@ -16,7 +15,7 @@ class NequipConvBlock(torch.nn.Module):
         self.n_layers = n_layers
         self.conv_layers = torch.nn.ModuleList(conv_layers)
         self.irreps_out = self.conv_layers[-1].irreps_out
-    
+
     def forward(self,x, h,
         <<edge_length_embeddings>>
         <<edge_sh>>
@@ -28,20 +27,20 @@ class NequipConvBlock(torch.nn.Module):
 
 
 def get_nequip_conv(
-        parity: bool,
-        lmax: int,
-        conv_feature_size: int,
-        node_embedding_irrep_in,
-        node_attr_irrep,
-        edge_attr_irrep,
-        edge_embedding_irrep,
-        avg_neigh=1,
-        nonlinearity_type="gate",
-        resnet=False,
-        nonlinearity_scalars={"e": "silu", "o": "tanh"},
-        nonlinearity_gates={"e": "silu", "o": "abs"},
-        radial_network_hidden_dim=64,
-        radial_network_layers=2,
+    parity: bool,
+    lmax: int,
+    conv_feature_size: int,
+    node_embedding_irrep_in,
+    node_attr_irrep,
+    edge_attr_irrep,
+    edge_embedding_irrep,
+    avg_neigh=1,
+    nonlinearity_type="gate",
+    resnet=False,
+    nonlinearity_scalars={"e": "silu", "o": "tanh"},
+    nonlinearity_gates={"e": "silu", "o": "abs"},
+    radial_network_hidden_dim=64,
+    radial_network_layers=2,
 ) -> torch.nn.Module:
     """
     Get NequIP convolution layer.
@@ -96,22 +95,22 @@ def get_nequip_conv(
 
 
 def get_nequip_conv_block(
-        n_conv_layers: int,
-        parity: bool,
-        lmax: int,
-        conv_feature_size: int,
-        node_embedding_irrep_in,
-        node_attr_irrep,
-        edge_attr_irrep,
-        edge_embedding_irrep,
-        avg_neigh=1,
-        nonlinearity_type="gate",
-        resnet=False,
-        nonlinearity_scalars: dict = {"e": "silu", "o": "tanh"},
-        nonlinearity_gates: dict = {"e": "silu", "o": "abs"},
-        radial_network_hidden_dim=64,
-        radial_network_layers=2,
-        graph_type="mic"  # "mic/staged"
+    n_conv_layers: int,
+    parity: bool,
+    lmax: int,
+    conv_feature_size: int,
+    node_embedding_irrep_in,
+    node_attr_irrep,
+    edge_attr_irrep,
+    edge_embedding_irrep,
+    avg_neigh=1,
+    nonlinearity_type="gate",
+    resnet=False,
+    nonlinearity_scalars: dict = {"e": "silu", "o": "tanh"},
+    nonlinearity_gates: dict = {"e": "silu", "o": "abs"},
+    radial_network_hidden_dim=64,
+    radial_network_layers=2,
+    graph_type="mic",  # "mic/staged"
 ) -> torch.nn.Module:
     """
     Returns NequIP convolution block, with multiple convolution layers.
@@ -160,12 +159,11 @@ def get_nequip_conv_block(
         last_node_irrep = conv_layer.irreps_out
 
     if graph_type == "mic":
-        nequip_model_str = re.sub(r"<<edge_length_embeddings>>",
-                                  "edge_length_embeddings,", NEQUIP_BLOCK)
-        nequip_model_str = re.sub(r"<<edge_sh>>",
-                                  "edge_sh,", nequip_model_str)
-        nequip_model_str = re.sub(r"<<edge_index>>",
-                                  "edge_index,", nequip_model_str)
+        nequip_model_str = re.sub(
+            r"<<edge_length_embeddings>>", "edge_length_embeddings,", NEQUIP_BLOCK
+        )
+        nequip_model_str = re.sub(r"<<edge_sh>>", "edge_sh,", nequip_model_str)
+        nequip_model_str = re.sub(r"<<edge_index>>", "edge_index,", nequip_model_str)
         conv_block = """
         for layer in self.conv_layers:
             h = layer(x, h, edge_length_embeddings, edge_sh, edge_index)
@@ -182,12 +180,11 @@ def get_nequip_conv_block(
             edge_sh += f"edge_sh_{layer},"
             edge_index += f"edge_index_{layer},"
 
-        nequip_model_str = re.sub(r"<<edge_length_embeddings>>",
-                                  edge_length_embedding, NEQUIP_BLOCK)
-        nequip_model_str = re.sub(r"<<edge_sh>>",
-                                  edge_sh, nequip_model_str)
-        nequip_model_str = re.sub(r"<<edge_index>>",
-                                  edge_index, nequip_model_str)
+        nequip_model_str = re.sub(
+            r"<<edge_length_embeddings>>", edge_length_embedding, NEQUIP_BLOCK
+        )
+        nequip_model_str = re.sub(r"<<edge_sh>>", edge_sh, nequip_model_str)
+        nequip_model_str = re.sub(r"<<edge_index>>", edge_index, nequip_model_str)
         conv_block = ""
 
         for i, i_inv in zip(range(n_conv_layers), range(n_conv_layers - 1, -1, -1)):

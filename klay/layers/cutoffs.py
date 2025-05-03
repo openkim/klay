@@ -1,5 +1,7 @@
 import torch
 
+from ..registry import ModuleCategory, register
+
 
 @torch.jit.script
 def _poly_cutoff(x: torch.Tensor, factor: float, p: float = 6.0) -> torch.Tensor:
@@ -13,6 +15,7 @@ def _poly_cutoff(x: torch.Tensor, factor: float, p: float = 6.0) -> torch.Tensor
     return out * (x < 1.0)
 
 
+@register("PolynomialCutoff", inputs=["x"], outputs=["y"], category=ModuleCategory.EMBEDDING)
 class PolynomialCutoff(torch.nn.Module):
     _factor: float
     p: float

@@ -1,12 +1,12 @@
-from typing import Optional
 import math
+from typing import Optional
 
 import torch
-
-from torch import nn
-
 from e3nn.math import soft_one_hot_linspace
 from e3nn.util.jit import compile_mode
+from torch import nn
+
+from ..registry import ModuleCategory, register
 
 
 @compile_mode("trace")
@@ -43,6 +43,7 @@ class e3nn_basis(nn.Module):
         return [{"forward": (torch.randn(5, 1),)} for _ in range(n)]
 
 
+@register("BesselBasis", inputs=["x"], outputs=["y"], category=ModuleCategory.EMBEDDING)
 class BesselBasis(nn.Module):
     r_max: float
     prefactor: float
@@ -70,9 +71,7 @@ class BesselBasis(nn.Module):
         self.r_max = float(r_max)
         self.prefactor = 2.0 / self.r_max
 
-        bessel_weights = (
-            torch.linspace(start=1.0, end=num_basis, steps=num_basis) * math.pi
-        )
+        bessel_weights = torch.linspace(start=1.0, end=num_basis, steps=num_basis) * math.pi
         if self.trainable:
             self.bessel_weights = nn.Parameter(bessel_weights)
         else:

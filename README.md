@@ -1,12 +1,12 @@
 ![](./KlayLogo.png)
 # KLay - KLIFF Layers, trainable and pre-trained layers for MLIPs
 [![Documentation Status](https://readthedocs.org/projects/klay/badge/?version=latest)](https://klay.readthedocs.io/en/latest/?badge=latest)
- 
+
 KLIFF compatible ML layers you can mould to your needs. Usable for general neural network architectures as well. Works out of the box with KLIFF.
 
 
 The idea of this package is to generate different kind of layers from simple yaml like input that the user can then assemble on their own for research and experimentation.
-Lot of different packages provide complete opaque models that are easy to use but hard to modify. 
+Lot of different packages provide complete opaque models that are easy to use but hard to modify.
 This package is supposed to take a complementary approach where the user can easily modify the layers to their needs.
 
 Currently only NequIP layers are supported. More layers will be added in the future.

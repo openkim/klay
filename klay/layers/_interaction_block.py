@@ -1,17 +1,25 @@
-""" Interaction Block """
-from typing import Optional, Dict, Callable
+"""Interaction Block"""
+
+from typing import Callable, Dict, Optional
 
 import torch
-
-from torch_runstats.scatter import scatter
-
 from e3nn import o3
 from e3nn.nn import FullyConnectedNet
-from e3nn.o3 import TensorProduct, Linear, FullyConnectedTensorProduct
+from e3nn.o3 import FullyConnectedTensorProduct, Linear, TensorProduct
+from torch_runstats.scatter import scatter
+
+from ..registry import ModuleCategory, register
 from ._non_linear import ShiftedSoftPlus
 
-#@torch.jit.script
+# @torch.jit.script
 
+
+@register(
+    "InteractionBlock",
+    inputs=["x", "h", "edge_length_embeddings", "edge_sh", "edge_index"],
+    outputs=["h"],
+    category=ModuleCategory.CONVOLUTION,
+)
 class InteractionBlock(torch.nn.Module):
     avg_num_neighbors: Optional[float]
     use_sc: bool
@@ -122,7 +130,6 @@ class InteractionBlock(torch.nn.Module):
                 feature_irreps_out,
             )
         self.irreps_out = feature_irreps_out
-
 
     def forward(self, x, h, edge_length_embeddings, edge_sh, edge_index):
         weight = self.fc(edge_length_embeddings)

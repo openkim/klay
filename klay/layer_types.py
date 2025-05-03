@@ -28,5 +28,3 @@ class ElemEmbedding(Enum):
     ONE_HOT = "one_hot"
     BINARY = "binary"
     ELECTRON = "electron"
-
-

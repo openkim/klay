@@ -1,7 +1,9 @@
-from klay import get_model_layers_from_yaml
 import torch
 
-layer = get_model_layers_from_yaml('model.yaml')
+from klay import get_model_layers_from_yaml
+
+layer = get_model_layers_from_yaml("model.yaml")
+
 
 class Model(torch.nn.Module):
     def __init__(self, layers):
@@ -19,7 +21,8 @@ class Model(torch.nn.Module):
         node_feat = self.layers[4](node_attr, node_feat, edge_feat, edge_sh, edge_index)
         forces = self.layers[5](node_feat)
         return forces
-    
+
+
 model = Model(layer)
 model = model.to(torch.float32)
 print(model)
@@ -28,7 +31,7 @@ from e3nn.util import jit
 
 model = jit.script(model)
 
-model.save('non_conservative_ef.pt')
+model.save("non_conservative_ef.pt")
 
 # random test data
 z = torch.randint(0, 5, (10,))

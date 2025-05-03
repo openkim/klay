@@ -1,9 +1,17 @@
 import torch
-from e3nn import o3, nn
-from e3nn.math import soft_unit_step, soft_one_hot_linspace
+from e3nn import nn, o3
+from e3nn.math import soft_one_hot_linspace, soft_unit_step
 from torch_scatter import scatter
 
+from ..registry import ModuleCategory, register
 
+
+@register(
+    "E3Attention",
+    inputs=["f", "edge_index", "edge_length", "edge_sh", "edge_length_embedded"],
+    outputs=["f_out"],
+    category=ModuleCategory.ATTENTION,
+)
 class E3Attention(torch.nn.Module):
     """
     An SE(3)-equivariant attention module.
@@ -21,7 +29,7 @@ class E3Attention(torch.nn.Module):
         irreps_value: o3.Irreps,
         number_of_basis: int = 10,
         max_radius: float = 1.3,
-        radial_neurons: int = 16
+        radial_neurons: int = 16,
     ):
         """
         Args:
@@ -49,54 +57,43 @@ class E3Attention(torch.nn.Module):
 
         # K: (f x SH) -> K
         self.tp_k = o3.FullyConnectedTensorProduct(
-            self.irreps_input,
-            self.irreps_sh,
-            self.irreps_key,
-            shared_weights=False
+            self.irreps_input, self.irreps_sh, self.irreps_key, shared_weights=False
         )
         self.fc_k = nn.FullyConnectedNet(
             [self.number_of_basis, radial_neurons, self.tp_k.weight_numel],
-            act=torch.nn.functional.silu
+            act=torch.nn.functional.silu,
         )
 
         # V: (f x SH) -> V
         self.tp_v = o3.FullyConnectedTensorProduct(
-            self.irreps_input,
-            self.irreps_sh,
-            self.irreps_value,
-            shared_weights=False
+            self.irreps_input, self.irreps_sh, self.irreps_value, shared_weights=False
         )
         self.fc_v = nn.FullyConnectedNet(
             [self.number_of_basis, radial_neurons, self.tp_v.weight_numel],
-            act=torch.nn.functional.silu
+            act=torch.nn.functional.silu,
         )
 
         # Dot product (Q x K) -> scalar (0e)
-        self.dot = o3.FullyConnectedTensorProduct(
-            self.irreps_query,
-            self.irreps_key,
-            "0e"
-        )
+        self.dot = o3.FullyConnectedTensorProduct(self.irreps_query, self.irreps_key, "0e")
 
         self.irreps_out = irreps_input
 
-    def forward(self, f: torch.Tensor, edge_index: torch.tensor, edge_length: torch.Tensor, edge_sh: torch.Tensor, edge_length_embedded: torch.Tensor):
+    def forward(
+        self,
+        f: torch.Tensor,
+        edge_index: torch.tensor,
+        edge_length: torch.Tensor,
+        edge_sh: torch.Tensor,
+        edge_length_embedded: torch.Tensor,
+    ):
 
         # Q (per-node)
         q = self.h_q(f)
 
-        edge_src, edge_dst = edge_index[0], edge_index[1] # 0 -> 1
+        edge_src, edge_dst = edge_index[0], edge_index[1]  # 0 -> 1
         # K, V (per-edge)
-        k = self.tp_k(
-            f[edge_dst],
-            edge_sh,
-            self.fc_k(edge_length_embedded)
-        )
-        v = self.tp_v(
-            f[edge_src],
-            edge_sh,
-            self.fc_v(edge_length_embedded)
-        )
+        k = self.tp_k(f[edge_dst], edge_sh, self.fc_k(edge_length_embedded))
+        v = self.tp_v(f[edge_src], edge_sh, self.fc_v(edge_length_embedded))
 
         # Compute unnormalized attention scores
         # get cutoffs from the radial basis?

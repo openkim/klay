@@ -1,12 +1,13 @@
-from typing import Dict, Callable, List
-import torch
+from typing import Callable, Dict, List
 
+import torch
 from e3nn import o3
 from e3nn.nn import Gate, NormActivation
-from . import InteractionBlock
-from ._non_linear import ShiftedSoftPlus
-from ..utils import tp_path_exists
 
+from ..registry import ModuleCategory, register
+from ..utils import tp_path_exists
+from ._interaction_block import InteractionBlock
+from ._non_linear import ShiftedSoftPlus
 
 acts = {
     "abs": torch.abs,
@@ -16,6 +17,12 @@ acts = {
 }
 
 
+@register(
+    "ConvNetLayer",
+    inputs=["x", "h", "edge_length_embeddings", "edge_sh", "edge_index"],
+    outputs=["h"],
+    category=ModuleCategory.CONVOLUTION,
+)
 class ConvNetLayer(torch.nn.Module):
     """
     Args:
@@ -26,11 +33,11 @@ class ConvNetLayer(torch.nn.Module):
 
     def __init__(
         self,
-        irreps_in, # its node embedding
+        irreps_in,  # its node embedding
         feature_irreps_hidden,
         node_attr_irreps,
         edge_attr_irreps,
-        edge_embedding_irreps,        
+        edge_embedding_irreps,
         convolution_kwargs: dict = {},
         resnet: bool = False,
         nonlinearity_type: str = "gate",
@@ -59,8 +66,7 @@ class ConvNetLayer(torch.nn.Module):
             [
                 (mul, ir)
                 for mul, ir in self.feature_irreps_hidden
-                if ir.l == 0
-                and tp_path_exists(irreps_in, edge_attr_irreps, ir)
+                if ir.l == 0 and tp_path_exists(irreps_in, edge_attr_irreps, ir)
             ]
         )
 
@@ -68,28 +74,21 @@ class ConvNetLayer(torch.nn.Module):
             [
                 (mul, ir)
                 for mul, ir in self.feature_irreps_hidden
-                if ir.l > 0
-                and tp_path_exists(irreps_in, edge_attr_irreps, ir)
+                if ir.l > 0 and tp_path_exists(irreps_in, edge_attr_irreps, ir)
             ]
         )
 
         irreps_layer_out = (irreps_scalars + irreps_gated).simplify()
 
         if nonlinearity_type == "gate":
-            ir = (
-                "0e"
-                if tp_path_exists(irreps_in, edge_attr_irreps, "0e")
-                else "0o"
-            )
+            ir = "0e" if tp_path_exists(irreps_in, edge_attr_irreps, "0e") else "0o"
             irreps_gates = o3.Irreps([(mul, ir) for mul, _ in irreps_gated])
 
             # TO DO, it's not that safe to directly use the
             # dictionary
             equivariant_nonlin = Gate(
                 irreps_scalars=irreps_scalars,
-                act_scalars=[
-                    acts[nonlinearity_scalars[ir.p]] for _, ir in irreps_scalars
-                ],
+                act_scalars=[acts[nonlinearity_scalars[ir.p]] for _, ir in irreps_scalars],
                 irreps_gates=irreps_gates,
                 act_gates=[acts[nonlinearity_gates[ir.p]] for _, ir in irreps_gates],
                 irreps_gated=irreps_gated,
@@ -125,7 +124,7 @@ class ConvNetLayer(torch.nn.Module):
             node_attr_irreps=node_attr_irreps,
             edge_attr_irreps=edge_attr_irreps,
             edge_embedding_irreps=edge_embedding_irreps,
-            **convolution_kwargs
+            **convolution_kwargs,
         )
         # The output features are whatever we got in
         # updated with whatever the convolution outputs (which is a full graph module)
@@ -143,5 +142,3 @@ class ConvNetLayer(torch.nn.Module):
         if self.resnet:
             h = old_h + h
         return h
-
-

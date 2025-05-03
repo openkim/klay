@@ -1,12 +1,12 @@
 import logging
-from typing import Optional, List
+from typing import List, Optional
 
 import torch
 import torch.nn.functional
+from e3nn.o3 import Linear
 from torch_runstats.scatter import scatter
 
-from e3nn.o3 import Linear
-
+from ..registry import ModuleCategory, register
 
 # class AtomwiseOperation(torch.nn.Module):
 #     def __init__(self, operation, field: str, irreps_in=None):
@@ -24,6 +24,7 @@ from e3nn.o3 import Linear
 #         return data
 
 
+@register("AtomwiseLinear", inputs=["h"], outputs=["h"], category=ModuleCategory.LINEAR)
 class AtomwiseLinear(torch.nn.Module):
     def __init__(
         self,
@@ -33,9 +34,7 @@ class AtomwiseLinear(torch.nn.Module):
         self.irreps_in = irreps_in
         self.irreps_out = irreps_out
         super().__init__()
-        self.linear = Linear(
-            irreps_in=self.irreps_in, irreps_out=self.irreps_out
-        )
+        self.linear = Linear(irreps_in=self.irreps_in, irreps_out=self.irreps_out)
 
     def forward(self, h):
         h = self.linear(h)

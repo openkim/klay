@@ -128,5 +128,3 @@ Functions
 
    :param yaml_file: Path to yaml file.
    :return: Sequential model.
-
-   
