@@ -4,6 +4,7 @@ from e3nn.o3 import Irreps
 from e3nn.util.jit import compile_mode
 
 from ...registry import ModuleCategory, register
+from .._base import _BaseLayer
 
 
 @register(
@@ -12,7 +13,7 @@ from ...registry import ModuleCategory, register
     outputs=["representation"],
     category=ModuleCategory.EMBEDDING,
 )
-class BinaryAtomicNumberEncoding(torch.nn.Module):
+class BinaryAtomicNumberEncoding(_BaseLayer, torch.nn.Module):
     """
     Compute a binary encoding of atoms' discrete atomic numbers.
     and returns a 1-0 encoding of atomic numbers of width 8.
@@ -28,3 +29,7 @@ class BinaryAtomicNumberEncoding(torch.nn.Module):
             representation[:, i] = x % 2
             x = torch.div(x, 2, rounding_mode="trunc")
         return representation
+
+    @classmethod
+    def from_config(cls):
+        return cls()

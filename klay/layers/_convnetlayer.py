@@ -1,11 +1,13 @@
-from typing import Callable, Dict, List
+from typing import Any, Callable, Dict, List
 
 import torch
 from e3nn import o3
 from e3nn.nn import Gate, NormActivation
+from e3nn.o3 import Irreps
 
 from ..registry import ModuleCategory, register
-from ..utils import tp_path_exists
+from ..utils import irreps_blocks_to_string, tp_path_exists
+from ._base import _BaseLayer
 from ._interaction_block import InteractionBlock
 from ._non_linear import ShiftedSoftPlus
 
@@ -23,7 +25,7 @@ acts = {
     outputs=["h"],
     category=ModuleCategory.CONVOLUTION,
 )
-class ConvNetLayer(torch.nn.Module):
+class ConvNetLayer(_BaseLayer, torch.nn.Module):
     """
     Args:
 
@@ -142,3 +144,74 @@ class ConvNetLayer(torch.nn.Module):
         if self.resnet:
             h = old_h + h
         return h
+
+    @classmethod
+    def from_config(
+        cls,
+        hidden_irrep_lmax: int,
+        edge_sh_lmax: int,
+        conv_feature_size: int,
+        input_block: List[dict[str, Any]],
+        node_attr_block: List[dict[str, Any]],
+        avg_neigh: int = 1,
+        num_radial_basis: int = 8,
+        convolution_kwargs: dict = {},
+        resnet: bool = False,
+        parity: bool = True,
+        radial_network_hidden_dim=64,
+        radial_network_layers=2,
+        nonlinearity_type: str = "gate",
+        nonlinearity_scalars: Dict[int, Callable] = {"e": "silu", "o": "tanh"},
+        nonlinearity_gates: Dict[int, Callable] = {"e": "silu", "o": "abs"},
+    ):
+        """Create a new instance from the config.
+
+        Args:
+            hidden_irrep_lmax (int): Maximum l value for hidden irreps.
+            edge_sh_lmax (int): Maximum l value for edge spherical harmonics.
+            conv_feature_size (int): Size of the convolution feature.
+            input_block (List[dict[str, Any]]): Input block configuration.
+            node_attr_block (List[dict[str, Any]]): Node attribute block configuration.
+            avg_neigh (int, optional): Average number of neighbors. Defaults to 1.
+            num_radial_basis (int, optional): Number of radial basis functions. Defaults to 8.
+            convolution_kwargs (dict, optional): Additional convolution parameters. Defaults to {}.
+            resnet (bool, optional): Whether to use residual connections. Defaults to False.
+            parity (bool, optional): Whether to use parity. Defaults to True.
+            radial_network_hidden_dim (int, optional): Hidden dimension for radial network. Defaults to 64.
+            radial_network_layers (int, optional): Number of layers in the radial network. Defaults to 2.
+            nonlinearity_type (str, optional): Type of nonlinearity. Defaults to "gate".
+            nonlinearity_scalars (Dict[int, Callable], optional): Nonlinearity scalars. Defaults to {"e": "silu", "o": "tanh"}.
+            nonlinearity_gates (Dict[int, Callable], optional): Nonlinearity gates. Defaults to {"e": "silu", "o": "abs"}.
+        """
+        node_embedding_irreps_in = irreps_blocks_to_string(input_block)
+        conv_hidden_irrep = Irreps(
+            [
+                (conv_feature_size, (l, p))
+                for p in ((1, -1) if parity else (1,))
+                for l in range(hidden_irrep_lmax + 1)
+            ]
+        )
+        edge_sh_irrep = Irreps.spherical_harmonics(edge_sh_lmax)
+
+        conv_kw = {
+            "invariant_layers": radial_network_layers,
+            "invariant_neurons": radial_network_hidden_dim,
+            "avg_num_neighbors": avg_neigh,
+        }
+
+        node_attr_irrep = irreps_blocks_to_string(node_attr_block)
+        edge_embedding_irrep = f"{num_radial_basis}x0e"
+
+        cls(
+            node_embedding_irreps_in,
+            conv_hidden_irrep,
+            node_attr_irrep,
+            edge_sh_irrep,
+            edge_embedding_irrep,
+            convolution_kwargs=conv_kw,
+            resnet=resnet,
+            nonlinearity_type=nonlinearity_type,
+            nonlinearity_scalars=nonlinearity_scalars,
+            nonlinearity_gates=nonlinearity_gates,
+        )
+        return cls

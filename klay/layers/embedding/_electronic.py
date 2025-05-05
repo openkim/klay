@@ -4,6 +4,7 @@ from e3nn.o3 import Irreps
 from e3nn.util.jit import compile_mode
 
 from ...registry import ModuleCategory, register
+from .._base import _BaseLayer
 
 
 @register(
@@ -13,7 +14,7 @@ from ...registry import ModuleCategory, register
     category=ModuleCategory.EMBEDDING,
 )
 @compile_mode("script")
-class ElectronicConfigurationEncoding(torch.nn.Module):
+class ElectronicConfigurationEncoding(_BaseLayer, torch.nn.Module):
     """
     Compute a binary encoding of atoms' discrete electronic configurations.
     Based on Spookynet's implementation.
@@ -151,3 +152,7 @@ class ElectronicConfigurationEncoding(torch.nn.Module):
     def forward(self, x):
         representation = self.e_config[x - 1].to(x.dtype).to(x.device)
         return representation
+
+    @classmethod
+    def from_config(cls):
+        return cls()

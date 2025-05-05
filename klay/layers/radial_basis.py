@@ -1,5 +1,5 @@
 import math
-from typing import Optional
+from typing import Any, Optional
 
 import torch
 from e3nn.math import soft_one_hot_linspace
@@ -7,6 +7,7 @@ from e3nn.util.jit import compile_mode
 from torch import nn
 
 from ..registry import ModuleCategory, register
+from ._base import _BaseLayer
 
 
 @compile_mode("trace")
@@ -44,7 +45,7 @@ class e3nn_basis(nn.Module):
 
 
 @register("BesselBasis", inputs=["x"], outputs=["y"], category=ModuleCategory.EMBEDDING)
-class BesselBasis(nn.Module):
+class BesselBasis(_BaseLayer, nn.Module):
     r_max: float
     prefactor: float
 
@@ -89,6 +90,17 @@ class BesselBasis(nn.Module):
         numerator = torch.sin(self.bessel_weights * x.unsqueeze(-1) / self.r_max)
 
         return self.prefactor * (numerator / x.unsqueeze(-1))
+
+    @classmethod
+    def from_config(cls, r_max, num_radial_basis=8, trainable=True):
+        """Create a new instance from the config.
+
+        Args:
+            r_max: Cutoff radius
+            num_basis: Number of Bessel Basis functions
+            trainable: Train the :math:`n \pi` part or not.
+        """
+        return cls(r_max=r_max, num_basis=num_radial_basis, trainable=trainable)
 
 
 # class GaussianBasis(nn.Module):

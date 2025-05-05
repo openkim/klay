@@ -6,6 +6,7 @@ from torch_geometric import nn as gnn
 from torch_scatter import scatter
 
 from ...registry import ModuleCategory, register
+from .._base import _BaseLayer
 
 
 @register(
@@ -14,7 +15,7 @@ from ...registry import ModuleCategory, register
     outputs=["h", "coords"],
     category=ModuleCategory.CONVOLUTION,
 )
-class EGCL(gnn.MessagePassing):
+class EGCL(_BaseLayer, gnn.MessagePassing):
     """
     \mathbf{m}_{ij} = \phi_e(\mathbf{h}_i^l, \mathbf{h}_j^i,\|r_i - r_j \|^2, a_{ij})
     r_i^{l+1} = r_i^l + C\sum (r_i^l - r_j^l)\phi_r(\mathbf{m}_{ij})
@@ -120,6 +121,39 @@ class EGCL(gnn.MessagePassing):
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         h = self.phi_h(torch.cat([h, messages[0]], 1))
         return h, messages[1]
+
+    @classmethod
+    def from_config(
+        cls,
+        *,
+        input_dim: int = 32,
+        hidden_dim: int = 32,
+        edge_dim: int = 0,
+        activation=nn.SiLU(),
+        n_hidden_layers=1,
+        normalize_radial=False,
+    ) -> "EGCL":
+        """Create a layer instance from a configuration dictionary.
+
+        Args:
+            input_dim (int, optional): Number of input dimensions. Defaults to 32.
+            hidden_dim (int, optional): Number of hidden dimensions. Defaults to 32.
+            edge_dim (int, optional): Number of edge dimensions. Defaults to 0.
+            activation (nn.Module, optional): Activation function. Defaults to nn.SiLU().
+            n_hidden_layers (int, optional): Number of hidden layers. Defaults to 1.
+            normalize_radial (bool, optional): Whether to normalize radial distances. Defaults to False.
+
+        Returns:
+            _BaseMLLayer: An instance of the layer.
+        """
+        return cls(
+            in_node_fl=input_dim,
+            hidden_node_fl=hidden_dim,
+            edge_fl=edge_dim,
+            act_fn=activation,
+            n_hidden_layers=n_hidden_layers,
+            normalize_radial=normalize_radial,
+        )
 
 
 # class EGNN(nn.Module):

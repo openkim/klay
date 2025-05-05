@@ -1,10 +1,11 @@
-from typing import Union
+from typing import Optional, Union
 
 import torch
 from e3nn import o3
 from e3nn.util.jit import compile_mode
 
 from ...registry import ModuleCategory, register
+from .._base import _BaseLayer
 from ..cutoffs import PolynomialCutoff
 from ..radial_basis import BesselBasis
 
@@ -16,7 +17,7 @@ from ..radial_basis import BesselBasis
     category=ModuleCategory.EMBEDDING,
 )
 @compile_mode("script")
-class SphericalHarmonicEdgeAttrs(torch.nn.Module):
+class SphericalHarmonicEdgeAttrs(_BaseLayer, torch.nn.Module):
     """Construct edge attrs as spherical harmonic projections of edge vectors.
 
     Parameters follow ``e3nn.o3.spherical_harmonics``.
@@ -53,6 +54,21 @@ class SphericalHarmonicEdgeAttrs(torch.nn.Module):
         edge_sh = self.sh(edge_vec)
         return edge_vec, edge_length, edge_sh
 
+    @classmethod
+    def from_config(cls, *, l_max: int = 1, normalization: Optional[str] = "component"):
+        """Create a new instance from the config.
+
+        Args:
+            l_max (int): maximum l for spherical harmonics
+            normalization (str): normalization scheme to use
+        """
+        edge_sh_normalization = normalization is not None
+        return cls(
+            irreps_in=l_max,
+            edge_sh_normalization=normalization,
+            edge_sh_normalize=edge_sh_normalization,
+        )
+
 
 @register(
     "RadialBasisEdgeEncoding",
@@ -61,7 +77,7 @@ class SphericalHarmonicEdgeAttrs(torch.nn.Module):
     category=ModuleCategory.EMBEDDING,
 )
 @compile_mode("script")
-class RadialBasisEdgeEncoding(torch.nn.Module):
+class RadialBasisEdgeEncoding(_BaseLayer, torch.nn.Module):
     def __init__(
         self,
         basis=BesselBasis,
@@ -77,3 +93,36 @@ class RadialBasisEdgeEncoding(torch.nn.Module):
     def forward(self, edge_length):
         edge_length_embedded = self.basis(edge_length) * self.cutoff(edge_length)[:, None]
         return edge_length_embedded
+
+    @classmethod
+    def from_config(
+        cls,
+        basis: str = "BesselBasis",
+        cutoff: str = "PolynomialCutoff",
+        basis_kwargs={},
+        cutoff_kwargs={},
+    ):
+        """Create a new instance from the config.
+
+        Args:
+            basis (str): name of the radial basis function
+            cutoff (str): name of the cutoff function
+            basis_kwargs (dict): kwargs for the radial basis function
+            cutoff_kwargs (dict): kwargs for the cutoff function
+        """
+        if basis == "BesselBasis":
+            basis = BesselBasis
+        else:
+            raise ValueError(f"Unknown basis: {basis}")
+
+        if cutoff == "PolynomialCutoff":
+            cutoff = PolynomialCutoff
+        else:
+            raise ValueError(f"Unknown cutoff: {cutoff}")
+
+        return cls(
+            basis=basis,
+            cutoff=cutoff,
+            basis_kwargs=basis_kwargs,
+            cutoff_kwargs=cutoff_kwargs,
+        )

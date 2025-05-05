@@ -9,6 +9,7 @@ from e3nn.o3 import FullyConnectedTensorProduct, Linear, TensorProduct
 from torch_runstats.scatter import scatter
 
 from ..registry import ModuleCategory, register
+from ._base import _BaseLayer
 from ._non_linear import ShiftedSoftPlus
 
 # @torch.jit.script
@@ -20,7 +21,7 @@ from ._non_linear import ShiftedSoftPlus
     outputs=["h"],
     category=ModuleCategory.CONVOLUTION,
 )
-class InteractionBlock(torch.nn.Module):
+class InteractionBlock(_BaseLayer, torch.nn.Module):
     avg_num_neighbors: Optional[float]
     use_sc: bool
 
@@ -155,3 +156,27 @@ class InteractionBlock(torch.nn.Module):
         if self.sc is not None:
             h = h + sc
         return h
+
+    @classmethod
+    def from_irreps(
+        cls, irreps_in, irreps_out, node_attr_irreps, edge_attr_irreps, edge_embedding_irreps
+    ):
+        """
+        Create an InteractionBlock from irreps.
+
+        Note: Not putting much effort into this, as this will not be used normally.
+
+        :param irreps_in: Input irreps
+        :param irreps_out: Output irreps
+        :param node_attr_irreps: Node attribute irreps
+        :param edge_attr_irreps: Edge attribute irreps
+        :param edge_embedding_irreps: Edge embedding irreps
+        :return: InteractionBlock instance
+        """
+        return cls(
+            irreps_in=irreps_in,
+            irreps_out=irreps_out,
+            node_attr_irreps=node_attr_irreps,
+            edge_attr_irreps=edge_attr_irreps,
+            edge_embedding_irreps=edge_embedding_irreps,
+        )

@@ -1,9 +1,13 @@
+from typing import Any
+
 import torch
 from e3nn import nn, o3
 from e3nn.math import soft_one_hot_linspace, soft_unit_step
 from torch_scatter import scatter
 
 from ..registry import ModuleCategory, register
+from ..utils import irreps_blocks_to_string
+from ._base import _BaseLayer
 
 
 @register(
@@ -12,7 +16,7 @@ from ..registry import ModuleCategory, register
     outputs=["f_out"],
     category=ModuleCategory.ATTENTION,
 )
-class E3Attention(torch.nn.Module):
+class E3Attention(_BaseLayer, torch.nn.Module):
     """
     An SE(3)-equivariant attention module.
         https://docs.e3nn.org/en/latest/guide/transformer.html
@@ -110,3 +114,44 @@ class E3Attention(torch.nn.Module):
         # Also sqrt(alpha) instead of alpha for normalization?
         f_out = scatter(alpha.relu().sqrt() * v, edge_dst, dim=0, dim_size=len(f))
         return f_out
+
+    @classmethod
+    def from_config(
+        cls,
+        irreps_input_block,
+        irreps_query_block,
+        irreps_key_block,
+        edge_sh_lmax,
+        irreps_value_block,
+        number_of_basis: int = 10,
+        max_radius: float = 1.3,
+        radial_neurons: int = 16,
+    ) -> Any:
+        """Create a new instance from the config.
+
+        Parameters:
+            irreps_input_block: Irreps of the input features.
+            irreps_query_block: Irreps of the query embeddings.
+            irreps_key_block: Irreps of the key embeddings.
+            edge_sh_lmax: l_max for spherical harmonics
+            irreps_value_block: Irreps of the value (also output) embeddings.
+            number_of_basis (int): Number of radial basis functions.
+            max_radius (float): Radius cutoff for the neighbor graph.
+            radial_neurons (int): Hidden size for the radial MLP.
+        """
+        irreps_input = o3.Irreps(irreps_blocks_to_string(irreps_input_block))
+        irreps_query = o3.Irreps(irreps_blocks_to_string(irreps_query_block))
+        irreps_key = o3.Irreps(irreps_blocks_to_string(irreps_key_block))
+        irreps_value = o3.Irreps(irreps_blocks_to_string(irreps_value_block))
+
+        irreps_edge_sh = o3.Irreps.spherical_harmonics(edge_sh_lmax)
+        return cls(
+            irreps_input=irreps_input,
+            irreps_query=irreps_query,
+            irreps_key=irreps_key,
+            irreps_edge_sh=irreps_edge_sh,
+            irreps_value=irreps_value,
+            number_of_basis=number_of_basis,
+            max_radius=max_radius,
+            radial_neurons=radial_neurons,
+        )

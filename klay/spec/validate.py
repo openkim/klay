@@ -1,69 +1,67 @@
-from typing import Any, Dict, List, Set
-
-import networkx as nx
-
-from klay.registry import names as layer_names
+# builder/validate.py
+from pprint import pformat
+from typing import Dict, List, Set
 
 
-def validate_spec(raw: Dict[str, Any]) -> Dict[str, Any]:
-    # ── 0. top-level sanity ───────────────────────────────────────────
-    if not isinstance(raw, dict):
-        raise ValueError("Top-level YAML must be a mapping")
+class ConfigValidationError(RuntimeError):
+    pass
 
-    layers: List[dict] = raw.get("layers")
-    if not isinstance(layers, list) or not layers:
-        raise ValueError("'layers' must be a non-empty list")
 
-    # optional “global” block
-    if "global" in raw and not isinstance(raw["global"], dict):
-        raise ValueError("'global' must be a mapping")
+def validate_config(cfg: Dict):
+    """Raise if the config is ill-formed or internally inconsistent."""
+    required_top = {"model_inputs", "model_layers", "model_outputs"}
+    missing = required_top - set(cfg)
+    if missing:
+        raise ConfigValidationError(f"Missing required sections: {missing}")
 
-    # ── 1. per-layer checks + build dependency list ──────────────────
-    seen_names: Set[str] = set()
-    graph_edges = []  # (src, dst) tuples
+    inputs = set(cfg["model_inputs"])
+    layers = cfg["model_layers"]
+    outputs = cfg["model_outputs"]
 
-    for idx, layer in enumerate(layers):
-        if not isinstance(layer, dict):
-            raise ValueError(f"layers[{idx}] must be a mapping")
+    # 1. every layer declares a type
+    for name, spec in layers.items():
+        if "type" not in spec:
+            raise ConfigValidationError(f"Layer '{name}' has no 'type' field.")
 
-        # 1a. type exists in registry
-        ltype = layer.get("type")
-        if ltype not in layer_names():
-            raise ValueError(
-                f"layers[{idx}].type='{ltype}' is unknown; "
-                f"available: {', '.join(layer_names())}"
+    # 2. gather all valid sources
+    defined: Set[str] = set(inputs)
+    for layer_name in layers:
+        defined.add(layer_name)
+
+    # 3. every edge source exists
+    def _check_mapping(mapping: Dict, ctx: str, node: str):
+        for src in mapping.values():
+            root = src.split(".")[0]  # e.g. "initial_inputs.atomic_numbers"
+            if root == "initial_inputs":
+                root = src.split(".")[1]
+            if root not in defined:
+                raise ConfigValidationError(f"{ctx} '{node}' refers to unknown source '{root}'.")
+
+    for lname, spec in layers.items():
+        _check_mapping(spec.get("inputs", {}), "Layer", lname)
+
+    for out in outputs:
+        if out["source"] not in defined:
+            raise ConfigValidationError(
+                f"Model output '{out['name']}' refers to unknown source '{out['source']}'"
             )
 
-        # 1b. kwargs mapping if present
-        if "kwargs" in layer and not isinstance(layer["kwargs"], dict):
-            raise ValueError(f"layers[{idx}].kwargs must be a mapping")
+    # 4. warn about dangling layers (present in graph, but not on any path to outputs)
+    used: Set[str] = {out["source"] for out in outputs}
 
-        # 1c. determine this layer’s unique name
-        lname = layer.get("name", f"{ltype}_{idx}")
-        if lname in seen_names:
-            raise ValueError(f"duplicate layer name '{lname}' (idx {idx})")
-        seen_names.add(lname)
-        layer["_auto_name"] = lname  # stash for builder
+    # walk backwards
+    queue: List[str] = list(used)
+    while queue:
+        current = queue.pop()
+        if current in layers:
+            for src in layers[current].get("inputs", {}).values():
+                parent = src.split(".")[0] if "." not in src else src.split(".")[0]
+                if parent == "initial_inputs":
+                    parent = src.split(".")[1]
+                if parent not in used:
+                    used.add(parent)
+                    queue.append(parent)
 
-        # 1d. inputs list (if present) must reference *earlier* layers
-        inputs = layer.get("inputs")
-        if inputs is not None:
-            if not (isinstance(inputs, list) and all(isinstance(s, str) for s in inputs)):
-                raise ValueError(f"layers[{idx}].inputs must be a list of strings")
-            for src in inputs:
-                if src not in seen_names:
-                    raise ValueError(f"layers[{idx}] refers to unknown or future layer '{src}'")
-                graph_edges.append((src, lname))
-        elif idx:  # implicit chain
-            prev_name = layers[idx - 1].get("_auto_name")
-            graph_edges.append((prev_name, lname))
-
-    # ── 2. cycle detection ───────────────────────────────────────────
-    g = nx.DiGraph()
-    g.add_nodes_from(seen_names)
-    g.add_edges_from(graph_edges)
-    if not nx.is_directed_acyclic_graph(g):
-        raise ValueError("layers graph contains a cycle")
-
-    raw["_graph"] = g  # for the DAG builder
-    return raw
+    dangling = set(layers) - used
+    if dangling:
+        print("[validate] Dangling layers that will never be reached:", pformat(dangling))

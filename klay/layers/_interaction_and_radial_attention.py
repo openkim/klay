@@ -1,7 +1,7 @@
 """Interaction Block"""
 
 import math
-from typing import Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 import torch
 from e3nn import o3
@@ -10,6 +10,7 @@ from e3nn.o3 import FullyConnectedTensorProduct, Linear, TensorProduct
 from torch_runstats.scatter import scatter
 
 from ..registry import ModuleCategory, register
+from ._base import _BaseLayer
 from ._non_linear import ShiftedSoftPlus
 
 
@@ -19,7 +20,7 @@ from ._non_linear import ShiftedSoftPlus
     outputs=["h"],
     category=ModuleCategory.ATTENTION,
 )
-class AttentionInteractionBlock(torch.nn.Module):
+class AttentionInteractionBlock(_BaseLayer, torch.nn.Module):
     avg_num_neighbors: Optional[float]
     use_sc: bool
 
@@ -153,11 +154,41 @@ class AttentionInteractionBlock(torch.nn.Module):
             h = h + sc
         return h
 
+    @classmethod
+    def from_config(
+        cls,
+        irreps_in,
+        irreps_out,
+        node_attr_irreps,
+        edge_attr_irreps,
+        edge_embedding_irreps,
+        invariant_layers=1,
+        invariant_neurons=8,
+        avg_num_neighbors=None,
+        use_sc=True,
+        nonlinearity_scalars: Dict[int, Callable] = {"e": "ssp"},
+    ) -> "AttentionInteractionBlock":
+        """
+        Create an AttentionInteractionBlock from configuration.
+        """
+        cls(
+            irreps_in=irreps_in,
+            irreps_out=irreps_out,
+            node_attr_irreps=node_attr_irreps,
+            edge_attr_irreps=edge_attr_irreps,
+            edge_embedding_irreps=edge_embedding_irreps,
+            invariant_layers=invariant_layers,
+            invariant_neurons=invariant_neurons,
+            avg_num_neighbors=avg_num_neighbors,
+            use_sc=use_sc,
+            nonlinearity_scalars=nonlinearity_scalars,
+        )
+
 
 @register(
     "RadialAttention", inputs=["r_ijs"], outputs=["attention"], category=ModuleCategory.ATTENTION
 )
-class RadialAttention(torch.nn.Module):
+class RadialAttention(_BaseLayer, torch.nn.Module):
     """
     Scalar radial attention mechanism.
     TODO: Equivariant attention?
@@ -196,3 +227,18 @@ class RadialAttention(torch.nn.Module):
         inputs = torch.sin(self.n * r_ijs.unsqueeze(-1)) / r_ijs.unsqueeze(-1)
         attention = self.nn(inputs)
         return attention
+
+    @classmethod
+    def from_config(
+        cls, n_input: int, n_hidden_layers: int, hidden_layer_width: int
+    ) -> "RadialAttention":
+        """Create a new instance from the config.
+
+        Args:
+            n_input (int): Number of input features.
+            n_hidden_layers (int): Number of hidden layers.
+            hidden_layer_width (int): Width of hidden layers.
+        """
+        return cls(
+            n_input=n_input, n_hidden_layers=n_hidden_layers, hidden_layer_width=hidden_layer_width
+        )

@@ -1,6 +1,9 @@
+from typing import Any
+
 import torch
 
 from ..registry import ModuleCategory, register
+from ._base import _BaseLayer
 
 
 @torch.jit.script
@@ -16,7 +19,7 @@ def _poly_cutoff(x: torch.Tensor, factor: float, p: float = 6.0) -> torch.Tensor
 
 
 @register("PolynomialCutoff", inputs=["x"], outputs=["y"], category=ModuleCategory.EMBEDDING)
-class PolynomialCutoff(torch.nn.Module):
+class PolynomialCutoff(_BaseLayer, torch.nn.Module):
     _factor: float
     p: float
 
@@ -44,3 +47,13 @@ class PolynomialCutoff(torch.nn.Module):
         x: torch.Tensor, input distance
         """
         return _poly_cutoff(x, self._factor, p=self.p)
+
+    @classmethod
+    def from_config(cls, r_max: float, polynomial_degree: float = 6):
+        """Create a new instance from the config.
+
+        Args:
+            r_max: Cutoff radius
+            polynomial_degree: Power used in envelope function
+        """
+        return cls(r_max=r_max, p=polynomial_degree)
