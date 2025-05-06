@@ -9,3 +9,4 @@ class ModuleCategory(Enum):
     CONVOLUTION = auto()
     LINEAR = auto()
     ATTENTION = auto()
+    AUTOGRAD = auto()
