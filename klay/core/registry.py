@@ -1,4 +1,3 @@
-# klay/registry/__init__.py
 from typing import Dict, List, Optional, Type
 
 from torch import nn
@@ -60,3 +59,12 @@ def names() -> List[str]:
     :return: sorted list of layer names
     """
     return sorted(_REGISTRY)
+
+
+def build(name: str, **cfg):
+    """Instantiate a registered layer via its from_config or __init__."""
+    meta = get(name)  # NodeMeta
+    cls = meta.cls
+    if hasattr(cls, "from_config"):
+        return cls.from_config(**cfg)
+    return cls(**cfg)

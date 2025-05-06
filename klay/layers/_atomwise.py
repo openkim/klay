@@ -6,7 +6,7 @@ import torch.nn.functional
 from e3nn.o3 import Linear
 from torch_runstats.scatter import scatter
 
-from ..registry import ModuleCategory, register
+from ..core import ModuleCategory, register
 from ..utils import irreps_blocks_to_string
 from ._base import _BaseLayer
 
@@ -42,24 +42,25 @@ class AtomwiseLinear(_BaseLayer, torch.nn.Module):
         h = self.linear(h)
         return h
 
+    @classmethod
     def from_config(
-        cls, irrep_in_block: List[dict[str, Any]], irrep_out_block: List[dict[str, Any]]
+        cls, irreps_in_block: List[dict[str, Any]], irreps_out_block: List[dict[str, Any]]
     ):
         """Create a new instance from the config.
 
         Example usage:
             atomwise_linear = AtomwiseLinear.from_config(
-                irrep_in_block=[{"l": 0, "p": odd, "mul": 10}],
-                irrep_out_block=[{"l": 0, "p": odd, "mul": 1}],
+                irreps_in_block=[{"l": 0, "p": odd, "mul": 10}],
+                irreps_out_block=[{"l": 0, "p": odd, "mul": 1}],
             )
             irreps_in = "0x10e", irreps_out = "0x1e", or a 10x1 Linear layer
 
         Args:
-            irrep_in_block: Irreps block for input
-            irrep_out_block: Irreps block for output
+            irreps_in_block: Irreps block for input
+            irreps_out_block: Irreps block for output
         """
-        irreps_in = irreps_blocks_to_string(irrep_in_block)
-        irreps_out = irreps_blocks_to_string(irrep_out_block)
+        irreps_in = irreps_blocks_to_string(irreps_in_block)
+        irreps_out = irreps_blocks_to_string(irreps_out_block)
         return cls(irreps_in=irreps_in, irreps_out=irreps_out)
 
 

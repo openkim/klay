@@ -8,7 +8,7 @@ from e3nn.nn import FullyConnectedNet
 from e3nn.o3 import FullyConnectedTensorProduct, Linear, TensorProduct
 from torch_runstats.scatter import scatter
 
-from ..registry import ModuleCategory, register
+from ..core import ModuleCategory, register
 from ._base import _BaseLayer
 from ._non_linear import ShiftedSoftPlus
 
@@ -158,7 +158,7 @@ class InteractionBlock(_BaseLayer, torch.nn.Module):
         return h
 
     @classmethod
-    def from_irreps(
+    def from_config(
         cls, irreps_in, irreps_out, node_attr_irreps, edge_attr_irreps, edge_embedding_irreps
     ):
         """

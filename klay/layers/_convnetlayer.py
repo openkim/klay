@@ -5,7 +5,7 @@ from e3nn import o3
 from e3nn.nn import Gate, NormActivation
 from e3nn.o3 import Irreps
 
-from ..registry import ModuleCategory, register
+from ..core import ModuleCategory, register
 from ..utils import irreps_blocks_to_string, tp_path_exists
 from ._base import _BaseLayer
 from ._interaction_block import InteractionBlock
@@ -148,7 +148,7 @@ class ConvNetLayer(_BaseLayer, torch.nn.Module):
     @classmethod
     def from_config(
         cls,
-        hidden_irrep_lmax: int,
+        hidden_irreps_lmax: int,
         edge_sh_lmax: int,
         conv_feature_size: int,
         input_block: List[dict[str, Any]],
@@ -167,7 +167,7 @@ class ConvNetLayer(_BaseLayer, torch.nn.Module):
         """Create a new instance from the config.
 
         Args:
-            hidden_irrep_lmax (int): Maximum l value for hidden irreps.
+            hidden_irreps_lmax (int): Maximum l value for hidden irreps.
             edge_sh_lmax (int): Maximum l value for edge spherical harmonics.
             conv_feature_size (int): Size of the convolution feature.
             input_block (List[dict[str, Any]]): Input block configuration.
@@ -188,7 +188,7 @@ class ConvNetLayer(_BaseLayer, torch.nn.Module):
             [
                 (conv_feature_size, (l, p))
                 for p in ((1, -1) if parity else (1,))
-                for l in range(hidden_irrep_lmax + 1)
+                for l in range(hidden_irreps_lmax + 1)
             ]
         )
         edge_sh_irrep = Irreps.spherical_harmonics(edge_sh_lmax)
@@ -200,9 +200,9 @@ class ConvNetLayer(_BaseLayer, torch.nn.Module):
         }
 
         node_attr_irrep = irreps_blocks_to_string(node_attr_block)
-        edge_embedding_irrep = f"{num_radial_basis}x0e"
+        edge_embedding_irrep = Irreps(f"{num_radial_basis}x0e")
 
-        cls(
+        return cls(
             node_embedding_irreps_in,
             conv_hidden_irrep,
             node_attr_irrep,
@@ -214,4 +214,3 @@ class ConvNetLayer(_BaseLayer, torch.nn.Module):
             nonlinearity_scalars=nonlinearity_scalars,
             nonlinearity_gates=nonlinearity_gates,
         )
-        return cls

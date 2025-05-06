@@ -5,7 +5,7 @@ from e3nn import nn, o3
 from e3nn.math import soft_one_hot_linspace, soft_unit_step
 from torch_scatter import scatter
 
-from ..registry import ModuleCategory, register
+from ..core import ModuleCategory, register
 from ..utils import irreps_blocks_to_string
 from ._base import _BaseLayer
 

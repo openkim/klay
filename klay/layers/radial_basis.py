@@ -6,7 +6,7 @@ from e3nn.math import soft_one_hot_linspace
 from e3nn.util.jit import compile_mode
 from torch import nn
 
-from ..registry import ModuleCategory, register
+from ..core import ModuleCategory, register
 from ._base import _BaseLayer
 
 

@@ -3,7 +3,7 @@ import torch.nn.functional
 from e3nn.o3 import Irreps
 from e3nn.util.jit import compile_mode
 
-from ...registry import ModuleCategory, register
+from ...core import ModuleCategory, register
 from .._base import _BaseLayer
 
 

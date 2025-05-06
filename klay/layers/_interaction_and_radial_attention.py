@@ -9,7 +9,7 @@ from e3nn.nn import FullyConnectedNet
 from e3nn.o3 import FullyConnectedTensorProduct, Linear, TensorProduct
 from torch_runstats.scatter import scatter
 
-from ..registry import ModuleCategory, register
+from ..core import ModuleCategory, register
 from ._base import _BaseLayer
 from ._non_linear import ShiftedSoftPlus
 

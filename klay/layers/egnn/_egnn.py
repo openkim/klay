@@ -5,7 +5,7 @@ from torch import nn
 from torch_geometric import nn as gnn
 from torch_scatter import scatter
 
-from ...registry import ModuleCategory, register
+from ...core import ModuleCategory, register
 from .._base import _BaseLayer
 
 

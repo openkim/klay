@@ -4,7 +4,7 @@ import torch
 from e3nn import o3
 from e3nn.util.jit import compile_mode
 
-from ...registry import ModuleCategory, register
+from ...core import ModuleCategory, register
 from .._base import _BaseLayer
 from ..cutoffs import PolynomialCutoff
 from ..radial_basis import BesselBasis
@@ -55,16 +55,16 @@ class SphericalHarmonicEdgeAttrs(_BaseLayer, torch.nn.Module):
         return edge_vec, edge_length, edge_sh
 
     @classmethod
-    def from_config(cls, *, l_max: int = 1, normalization: Optional[str] = "component"):
+    def from_config(cls, *, lmax: int = 1, normalization: Optional[str] = "component"):
         """Create a new instance from the config.
 
         Args:
-            l_max (int): maximum l for spherical harmonics
+            lmax (int): maximum l for spherical harmonics
             normalization (str): normalization scheme to use
         """
         edge_sh_normalization = normalization is not None
         return cls(
-            irreps_in=l_max,
+            irreps_in=lmax,
             edge_sh_normalization=normalization,
             edge_sh_normalize=edge_sh_normalization,
         )
@@ -97,6 +97,10 @@ class RadialBasisEdgeEncoding(_BaseLayer, torch.nn.Module):
     @classmethod
     def from_config(
         cls,
+        r_max: float,
+        num_radial_basis: int = 8,
+        polynomial_degree: float = 6,
+        radial_basis_trainable: bool = True,
         basis: str = "BesselBasis",
         cutoff: str = "PolynomialCutoff",
         basis_kwargs={},
@@ -105,6 +109,10 @@ class RadialBasisEdgeEncoding(_BaseLayer, torch.nn.Module):
         """Create a new instance from the config.
 
         Args:
+            r_max (float): cutoff radius
+            num_radial_basis (int): number of radial basis functions
+            polynomial_degree (float): degree of the polynomial cutoff
+            radial_basis_trainable (bool): whether the radial basis function is trainable
             basis (str): name of the radial basis function
             cutoff (str): name of the cutoff function
             basis_kwargs (dict): kwargs for the radial basis function
@@ -115,10 +123,21 @@ class RadialBasisEdgeEncoding(_BaseLayer, torch.nn.Module):
         else:
             raise ValueError(f"Unknown basis: {basis}")
 
+        basis_kwargs |= {
+            "r_max": r_max,
+            "num_basis": num_radial_basis,
+            "trainable": radial_basis_trainable,
+        }
+
         if cutoff == "PolynomialCutoff":
             cutoff = PolynomialCutoff
         else:
             raise ValueError(f"Unknown cutoff: {cutoff}")
+
+        cutoff_kwargs |= {
+            "r_max": r_max,
+            "p": polynomial_degree,
+        }
 
         return cls(
             basis=basis,

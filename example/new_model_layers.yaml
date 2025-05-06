@@ -1,0 +1,44 @@
+model_params:
+  r_max: 4.0
+  n_channels: 32
+  num_elems: 2
+
+model_layers:
+  element_embedding:
+    type: OneHotAtomEncoding
+    config: {num_elems: 2}
+
+  edge_feature0:
+    type: SphericalHarmonicEdgeAttrs
+    config: {lmax: 1}
+
+  radial_basis_func:
+    type: RadialBasisEdgeEncoding
+    config:
+      r_max: ${model_params.r_max}
+
+  node_features:
+    type: AtomwiseLinear
+    config:
+      irreps_in_block:
+        - {"l": 0, "mul": '${model_params.num_elems}'}
+      irreps_out_block:
+        - {"l": 0, "mul": '${model_params.n_channels}'}
+
+  conv1:
+    type: ConvNetLayer
+    config:
+      hidden_irreps_lmax: 1
+      edge_sh_lmax: 1
+      conv_feature_size: ${model_params.n_channels}
+      input_block: ${model_layers.node_features.config.irreps_out_block}
+      node_attr_block: ${model_layers.node_features.config.irreps_in_block}
+
+  output_projection:
+    type: AtomwiseLinear
+    config:
+      irreps_in_block:
+        - {"l": 0, "mul": '${model_params.n_channels}'}
+        - {"l": 1, "mul": '${model_params.n_channels}'}
+      irreps_out_block:
+        - {"l": 0, "mul": 1}

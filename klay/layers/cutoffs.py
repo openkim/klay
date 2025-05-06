@@ -2,7 +2,7 @@ from typing import Any
 
 import torch
 
-from ..registry import ModuleCategory, register
+from ..core import ModuleCategory, register
 from ._base import _BaseLayer
 
 
