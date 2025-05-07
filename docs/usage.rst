@@ -10,9 +10,88 @@ together, and the shorthand notations you can use to keep configs concise.
 A complete, minimal example is shown first; each part is dissected in the
 sections that follow.
 
-.. literalinclude:: ../example/mace_model.yaml
-   :language: yaml
-   :caption: *A working MACE-style energy + force model.*
+.. code-block:: yaml
+
+    model_params:
+      r_max: 4.0
+      n_channels: 32
+      num_elems: 2
+
+    model_inputs:
+      atomic_numbers: "Tensor (N,)"
+      positions: "Tensor (N,3)"
+      edge_index: "Tensor (2,E)"
+
+    model_layers:
+      element_embedding:
+        type: OneHotAtomEncoding
+        config: {num_elems: 2}
+        inputs: {x: model_inputs.atomic_numbers}
+
+      edge_feature0:
+        type: SphericalHarmonicEdgeAttrs
+        config: {lmax: 1}
+        inputs:
+          pos: model_inputs.positions
+          edge_index: model_inputs.edge_index
+        output: {0: vec0, 1: len0, 2: sh0}
+
+      radial_basis_func:
+        type: RadialBasisEdgeEncoding
+        config:
+          r_max: ${model_params.r_max}
+        inputs:
+          edge_length: len0
+
+      node_features:
+        type: AtomwiseLinear
+        config:
+          irreps_in_block:
+            - {"l": 0, "mul": '${model_params.num_elems}'}
+          irreps_out_block:
+            - {"l": 0, "mul": '${model_params.n_channels}'}
+        inputs: {h: element_embedding}
+
+      conv1:
+        type: MACE_layer
+        config:
+          lmax: 1
+          correlation: 2
+          num_elements: ${model_params.num_elems}
+          hidden_irreps_block:
+            - {"l": 0, "mul": '${model_params.n_channels}'}
+            - {"l": 1, "mul": '${model_params.n_channels}'}
+          input_block: ${model_layers.node_features.config.irreps_out_block}
+          node_attr_block: ${model_layers.node_features.config.irreps_in_block}
+        inputs:
+          vectors: vec0
+          node_feats: node_features
+          node_attrs: element_embedding
+          edge_feats: radial_basis_func
+          edge_index: model_inputs.edge_index
+
+      output_projection:
+        type: AtomwiseLinear
+        config:
+          irreps_in_block:
+            - {"l": 0, "mul": '${model_params.n_channels}'}
+            - {"l": 1, "mul": '${model_params.n_channels}'}
+          irreps_out_block:
+            - {"l": 0, "mul": 1}
+        inputs: {h: conv1}
+
+      forces:
+        type: AutogradForces
+        inputs:
+          energy: output_projection
+          pos: model_inputs.positions
+
+    model_outputs:
+      energy: output_projection
+      forces: forces
+      representation: conv1
+
+
 
 ----------------------------------------------------------------
 1.  ``model_params`` – hyper-parameters & shared constants
@@ -73,14 +152,14 @@ Keys
 Input references
 ~~~~~~~~~~~~~~~~
 
-===============  =========================================
-Form             Meaning
-===============  =========================================
+===============    =========================================
+Form               Meaning
+===============    =========================================
 ``model_inputs.x`` | forward() argument ``x``
 ``layer_name``     | whole output of that layer
 ``layer_name.k``   | *k-th* tuple element **or** dict key ``k``
 any alias          | whatever ``output:`` mapped under that name
-===============  =========================================
+===============    =========================================
 
 Output mapping
 ~~~~~~~~~~~~~~
