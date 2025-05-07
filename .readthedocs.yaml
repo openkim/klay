@@ -1,21 +1,18 @@
 # .readthedocs.yaml
 version: 2
 
-# ───────────────────────────── Build system ────────────────────────────────
 build:
   os: ubuntu-22.04
   tools:
     python: "3.10"
 
-# ───────────────────────────── Python env ───────────────────────────────────
 python:
   install:
-    - method: pip
-      path: .
+    - path: .
       extra_requirements:
         - docs
-    - method: pip
-      requirements: docs/requirements.txt
+
+    - requirements: docs/requirements.txt
 
 sphinx:
   configuration: docs/conf.py
