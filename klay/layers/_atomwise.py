@@ -64,6 +64,40 @@ class AtomwiseLinear(_BaseLayer, torch.nn.Module):
         return cls(irreps_in=irreps_in, irreps_out=irreps_out)
 
 
+@register(
+    "AtomwiseSumIndex", inputs=["src", "index"], outputs=["h"], category=ModuleCategory.LINEAR
+)
+class AtomwiseSumIndex(_BaseLayer, torch.nn.Module):
+    """
+    Add the values of the input tensor at the specified indices.
+    Replacement for torch_scatter_add.
+    """
+
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, src: torch.Tensor, index: torch.Tensor) -> torch.Tensor:
+        if index.dtype != torch.long:
+            raise TypeError("index must be torch.long")
+
+        if index.dim() < src.dim():
+            for _ in range(src.dim() - index.dim()):
+                index = index.unsqueeze(-1)
+
+        dim_size = int(index.max().item()) + 1
+
+        out_shape = list(src.shape)
+        out_shape[0] = dim_size
+        reduced_out = src.new_zeros(out_shape)
+
+        reduced_out.scatter_add_(0, index, src)
+        return reduced_out
+
+    @classmethod
+    def from_config(cls):
+        return cls()
+
+
 # class AtomwiseReduce(torch.nn.Module):
 #     constant: float
 
