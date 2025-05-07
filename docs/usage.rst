@@ -1,135 +1,177 @@
-Usage
-=====
+.. _usage:
 
-Easiest way to use is to use the function :func:`klay.get_model_layers_from_yaml` to get the layers you want. You need to provide a yaml file with block titled `model`. Model block should have list of layer configs for each layer. The :func:`klay.get_model_layers_from_yaml` function will return a list of layers in sequential order. You can use the ``DETECT_PREV`` keyword in certain blocks to dynamically use the ouutput of previous layer. For example, in the following yaml file, ``linear_e3nn`` layer will use the output ``radial_basis`` layer as input.
+==========================
+Using KLay
+==========================
+
+This page explains **every section of a KLay YAML file**, how the fields fit
+together, and the shorthand notations you can use to keep configs concise.
+
+A complete, minimal example is shown first; each part is dissected in the
+sections that follow.
+
+.. literalinclude:: ../example/mace_model.yaml
+   :language: yaml
+   :caption: *A working MACE-style energy + force model.*
+
+----------------------------------------------------------------
+1.  ``model_params`` – hyper-parameters & shared constants
+----------------------------------------------------------------
+
+``model_params`` is a free-form mapping of names → values.
+Any value can be *referenced* later with OmegaConf interpolation::
+
+   ${model_params.r_max}
+
+Typical items:
+
+* cut-off radii (``r_max``), channel counts, element counts
+* Booleans (``use_pbc``), learning-rate schedules …
+
+----------------------------------------------------------------
+2.  ``model_inputs`` – declare the forward() signature
+----------------------------------------------------------------
+
+Keys become **argument names** of the generated model:
 
 .. code-block:: yaml
 
-    model:
-        - elem_embedding:
-            embedding_type: one_hot
-            n_elems: 5
+   model_inputs:
+     atomic_numbers:  "Tensor (N,)"
+     positions:       "Tensor (N,3)"
+     edge_index:      "Tensor (2,E)"
+     shifts:          "Tensor (E,3)"     # optional for PBC
 
-        - edge_embedding:
-            lmax: 6
-            normalize: True
-            normalization: component
-            parity: True
+*The value is just a comment; KLay never parses it.*
 
-        - radial_basis:
-            r_max: 5.0
-            num_basis: 8
-            trainable: True
-            power: 1
+----------------------------------------------------------------
+3.  ``model_layers`` – the heart of the graph
+----------------------------------------------------------------
 
-        - linear_e3nn:
-            irreps_in: DETECT_PREV
-            irreps_out: 16x0e
+Each top-level key creates **one node** in the DAG.
 
-        - nequip_conv_block:
-            n_conv_layers: 2
-            parity: True
-            lmax: 1
-            conv_feature_size: 16
-            node_embedding_irrep_in: DETECT_PREV
-            node_attr_irrep: DETECT_PREV
-            edge_attr_irrep: DETECT_PREV
-            edge_embedding_irrep: DETECT_PREV
-            avg_neigh: 1
-            resnet: True
-            radial_network_hidden_dim: 64
-            radial_network_layers: 2
+Layer declaration
+=================
 
-        - linear_e3nn:
-            irreps_in: DETECT_PREV
-            irreps_out: 1x1e
+.. code-block:: yaml
 
-Should return 6 nequip model layers with following configuration:
+   element_embedding:
+     type: OneHotAtomEncoding           # registry key
+     config: {num_elems: ${model_params.num_elems}}
+     inputs: {x: model_inputs.atomic_numbers}
 
-.. code-block:: python
+Keys
+~~~~
 
-    from klay import get_model_layers_from_yaml
-    model = get_model_layers_from_yaml('model.yaml')
-    print(model)
++ ``type``  | registry key (see ``klay layers``)
++ ``config``| kwargs passed to ``from_config`` or ``__init__``
++ ``inputs``| mapping *port -> source*
++ ``output``| *optional* mapping *inner-key (or index) -> alias*
++ ``alias`` | *optional* — treat this entry as **another call-site** for an
+              already-declared module (shared weights)
 
-.. code-block:: text
+Input references
+~~~~~~~~~~~~~~~~
 
-    ---------------------------------------------------------
-    Generated layers with 21912 parameters
-    ---------------------------------------------------------
-    (0): OneHotAtomEncoding()
-    (1): SphericalHarmonicEdgeAttrs(
-        (sh): SphericalHarmonics()
-    )
-    (2): RadialBasisEdgeEncoding(
-        (basis): BesselBasis()
-        (cutoff): PolynomialCutoff()
-    )
-    (3): AtomwiseLinear(
-        (linear): Linear(8x0e -> 16x0e | 128 weights)
-    )
-    (4): NequipConvBlock(
-        (conv_layers): ModuleList(
-        (0): ConvNetLayer(
-            (equivariant_nonlin): Gate (32x0e+16x1o -> 16x0e+16x1o)
-            (conv): InteractionBlock(
-            (linear_1): Linear(16x0e -> 16x0e | 256 weights)
-            (fc): FullyConnectedNet[8, 64, 64, 32]
-            (tp): TensorProduct(16x0e x 1x0e+1x1o -> 16x0e+16x1o | 32 paths | 32 weights)
-            (linear_2): Linear(16x0e+16x1o -> 32x0e+16x1o | 768 weights)
-            (sc): FullyConnectedTensorProduct(16x0e x 1x0e -> 32x0e+16x1o | 512 paths | 512 weights)
-            )
-        )
-        (1): ConvNetLayer(
-            (equivariant_nonlin): Gate (48x0e+16x1o+16x1e -> 16x0e+16x1e+16x1o)
-            (conv): InteractionBlock(
-            (linear_1): Linear(16x0e+16x1o -> 16x0e+16x1o | 512 weights)
-            (fc): FullyConnectedNet[8, 64, 64, 80]
-            (tp): TensorProduct(16x0e+16x1o x 1x0e+1x1o -> 32x0e+32x1o+16x1e | 80 paths | 80 weights)
-            (linear_2): Linear(32x0e+32x1o+16x1e -> 48x0e+16x1o+16x1e | 2304 weights)
-            (sc): FullyConnectedTensorProduct(16x0e+16x1o x 1x0e -> 48x0e+16x1o+16x1e | 1024 paths | 1024 weights)
-            )
-        )
-        )
-    )
-    (5): AtomwiseLinear(
-        (linear): Linear(16x0e+16x1e+16x1o -> 1x1o | 16 weights)
-    )
-    )
+===============  =========================================
+Form             Meaning
+===============  =========================================
+``model_inputs.x`` | forward() argument ``x``
+``layer_name``     | whole output of that layer
+``layer_name.k``   | *k-th* tuple element **or** dict key ``k``
+any alias          | whatever ``output:`` mapped under that name
+===============  =========================================
 
-You can see the example in `examples` folder for more details. You can now use these layers in your model. Below is an example of how to use these layers in a model.
+Output mapping
+~~~~~~~~~~~~~~
 
-.. code-block:: python
+Use it when a layer returns a **tuple** or **dict** and you want human-readable
+names:
 
-    import torch
-    from klay import get_model_layers_from_yaml
+.. code-block:: yaml
 
-    layers = get_model_layers_from_yaml('model.yaml')
+   edge_feature0:
+     type: SphericalHarmonicEdgeAttrs
+     output:
+       0: vec0          # tuple index → alias
+       1: len0
+       2: sh0
 
-    class Model(torch.nn.Module):
-        def __init__(self, layers):
-            super(Model, self).__init__()
-            self.layers = torch.nn.ModuleList(layers)
+KLay auto-creates *both* the alias (``len0``) **and** ``edge_feature0.1``
+reference.
 
-        def forward(self, z, pos, edge_index, shifts):
-            node_attr = self.layers[0](z)
-            edge_vec, edge_length, edge_sh = self.layers[1](pos, edge_index, shifts)
-            edge_embedding = self.layers[2](edge_length)
-            node_embedding = self.layers[3](node_attr)
-            node_embedding = self.layers[4](node_attr, node_embedding, edge_embedding, edge_sh, edge_index)
-            node_embedding = self.layers[5](node_embedding)
-            return node_embedding
+Alias (weight sharing, Experimental)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    model = Model(layers)
+.. code-block:: yaml
 
-    # Example input
-    z = torch.randn(10, 5)
-    pos = torch.randn(10, 3)
-    edge_index = torch.tensor([[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [1, 2, 3, 4, 5, 6, 7, 8, 9, 0]])
-    shifts = torch.randn(10, 3)
+   edge_conv:                       # declares module
+     type: ConvNetLayer
+     config: {…}
 
-    # Forward pass
-    out = model(z, pos, edge_index, shifts)
-    print(out)
+   conv1:                           # extra call (shares weights)
+     alias: edge_conv
+     inputs: {h: node_features, edge_sh: sh0}
 
-This gives the flexibility to generate arbitrary layers and assemble them like LEGO blocks.
+----------------------------------------------------------------
+4.  ``model_outputs`` – what you want out
+----------------------------------------------------------------
+
+A **mapping** where the key is the public name and the value is a reference:
+
+.. code-block:: yaml
+
+   model_outputs:
+     energy:          output_projection
+     forces:          forces
+     representation:  conv1
+
+* A trailing ``.k`` or ``.key`` selects a field from tuple/dict.
+* If you omit ``model_inputs`` *and* ``model_outputs`` the builder returns a
+  dict ``{name: nn.Module}`` – handy for “layer library” configs.
+
+----------------------------------------------------------------
+Cheat-sheet
+----------------------------------------------------------------
+
+.. list-table::
+   :header-rows: 1
+
+   * - Syntax
+     - Expands to
+     - Use-case
+   * - ``model_inputs.pos``
+     - placeholder tensor ``pos``
+     - raw model input
+   * - ``layerA``
+     - full output of ``layerA``
+     - single-output layers
+   * - ``layerA.2``
+     - 3ʳᵈ tuple slot of ``layerA``
+     - tuple-return layers
+   * - ``layerA.edge_len``
+     - dict key ``"edge_len"`` of ``layerA``
+     - dict-return layers
+   * - ``alias_name``
+     - whatever ``output:`` mapped to that alias
+     - readable wiring
+
+----------------------------------------------------------------
+Gotchas & best practices
+----------------------------------------------------------------
+
+* **Forces training** – set ``create_graph: true`` in the
+  ``ForceFromEnergy`` layer to keep second-order derivatives.
+* **Avoid dotted aliases** for clarity: prefer ``edge_length: len0`` over
+  ``edge_feature0.1``.
+* **Validate & draw** your graph before training:
+
+  .. code-block:: bash
+
+     klay validate model.yml -v
+
+* **Export** a stand-alone TorchScript model:
+
+  .. code-block:: bash
+
+     klay export model.yml -o model.pt
