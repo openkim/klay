@@ -152,14 +152,20 @@ Keys
 Input references
 ~~~~~~~~~~~~~~~~
 
-===============    =========================================
-Form               Meaning
-===============    =========================================
-``model_inputs.x`` | forward() argument ``x``
-``layer_name``     | whole output of that layer
-``layer_name.k``   | *k-th* tuple element **or** dict key ``k``
-any alias          | whatever ``output:`` mapped under that name
-===============    =========================================
+.. list-table::
+   :header-rows: 1
+
+   * - Syntax
+     - Meaning
+   * - ``model_inputs.x``
+     - forward() argument ``x``
+   * - ``layer_name``
+     - whole output of that layer
+   * - ``layer_name.k``
+     - *k-th* tuple element **or** dict key ``k``
+   * - any alias
+     - whatever ``output:`` mapped under that name
+
 
 Output mapping
 ~~~~~~~~~~~~~~
