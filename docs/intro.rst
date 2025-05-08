@@ -43,7 +43,7 @@ Quick installation
 
    pip install klay              # latest release
    # or: bleeding-edge
-   pip install git+https://github.com/your-org/klay.git
+   pip install git+https://github.com/openkim/klay.git
 
 One-minute example
 ==================
@@ -74,9 +74,9 @@ Architecture in a nutshell
 
    graph LR
        subgraph "OmegaConf / YAML"
-          Y(model_inputs) --> Y(model_layers) --> Y(model_outputs)
+          X(model_inputs) --> Y(model_layers) --> Z(model_outputs)
        end
-       Y --> D(DAG / NetworkX)
+       Z --> D(DAG / NetworkX)
        D --> FX(torch.fx.GraphModule)
        FX -->|TorchScript| PT(.pt)
        FX -->|torch.compile| JIT(Optimised model)

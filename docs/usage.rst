@@ -142,11 +142,11 @@ Layer declaration
 Keys
 ~~~~
 
-+ ``type``  | registry key (see ``klay layers``)
-+ ``config``| kwargs passed to ``from_config`` or ``__init__``
-+ ``inputs``| mapping *port -> source*
-+ ``output``| *optional* mapping *inner-key (or index) -> alias*
-+ ``alias`` | *optional* — treat this entry as **another call-site** for an
++ ``type``   | registry key (see ``klay layers``)
++ ``config`` | kwargs passed to ``from_config`` or ``__init__``
++ ``inputs`` | mapping *port -> source*
++ ``output`` | *optional* mapping *inner-key (or index) -> alias*
++ ``alias``  | *optional* — treat this entry as **another call-site** for an
               already-declared module (shared weights)
 
 Input references
@@ -194,9 +194,9 @@ Example
 .. code-block:: python
 
    blocks = [
-       {"l": 0, "mul": 64},                # 0  → default even  → 64x0e
-       {"l": 1, "mul": 32},                # 1  → default odd   → 32x1o
-       {"l": 2, "mul": 16, "p": "odd"},    # explicit override → 16x2o
+       {"l": 0, "mul": 64},                # 0  -> default even  -> 64x0e
+       {"l": 1, "mul": 32},                # 1  -> default odd   -> 32x1o
+       {"l": 2, "mul": 16, "p": "odd"},    # explicit override -> 16x2o
    ]
 
    >>> irreps_blocks_to_string(blocks)
@@ -218,7 +218,7 @@ names:
    edge_feature0:
      type: SphericalHarmonicEdgeAttrs
      output:
-       0: vec0          # tuple index → alias
+       0: vec0          # tuple index -> alias
        1: len0
        2: sh0
 
