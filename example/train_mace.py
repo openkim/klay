@@ -14,7 +14,7 @@ mace_model = jit.script(mace_model)
 
 workspace = {"name": "GNN_train_example", "random_seed": 12345}
 dataset = {"type": "path", "path": "Si_training_set_4_configs", "shuffle": True}
-model = {"name": "MACE1", "input_args": ["species", "coords", "edge_index0"]}
+model = {"name": "MACE1", "input_args": ["species", "coords", "edge_index0", "contributing"]}
 transforms = {
     "configuration": {
         "name": "RadialGraph",

@@ -69,32 +69,41 @@ class AtomwiseLinear(_BaseLayer, torch.nn.Module):
 )
 class AtomwiseSumIndex(_BaseLayer, torch.nn.Module):
     """
-    Add the values of the input tensor at the specified indices.
-    Replacement for torch_scatter_add.
+    Scatter-sum along the first dimension.
+      - model.train() -> full scatter-summed tensor
+      - model.eval()  -> only the first row
+    Fully TorchScript-compatible; the same scripted artefact can be loaded
+    from C++ and will respect `module.eval()`.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
 
     def forward(self, src: torch.Tensor, index: torch.Tensor) -> torch.Tensor:
         if index.dtype != torch.long:
-            raise TypeError("index must be torch.long")
+            raise RuntimeError("index must have dtype torch.long")
 
         if index.dim() < src.dim():
             for _ in range(src.dim() - index.dim()):
-                index = index.unsqueeze(-1)
+                index = index.unsqueeze(-1)  # Script-compatible loop
 
         dim_size = int(index.max().item()) + 1
 
         out_shape = list(src.shape)
         out_shape[0] = dim_size
         reduced_out = src.new_zeros(out_shape)
-
         reduced_out.scatter_add_(0, index, src)
-        return reduced_out
 
+        if self.training:
+            return reduced_out  # training -> full tensor
+        else:
+            return reduced_out[0]  # eval -> runtime in kim-api, contributing enegry
+
+    # --------------------------------------------------------------------- #
+    # Factory for YAML / config usage                                       #
+    # --------------------------------------------------------------------- #
     @classmethod
-    def from_config(cls):
+    def from_config(cls, _: Any = None) -> "AtomwiseSumIndex":
         return cls()
 
 
