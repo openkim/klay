@@ -100,7 +100,7 @@ class AtomwiseSumIndex(_BaseLayer, torch.nn.Module):
             return reduced_out[0]  # eval -> runtime in kim-api, contributing enegry
 
     @classmethod
-    def from_config(cls, _: Any = None) -> "AtomwiseSumIndex":
+    def from_config(cls) -> "AtomwiseSumIndex":
         return cls()
 
 
