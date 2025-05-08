@@ -178,9 +178,9 @@ model_outputs:
 ```
 
 # Roadmap
- - [ ] MACE tensor-product layer
  - [ ] EGNN & SEGNN blocks
  - [ ] Pre-trained M3GNet & GemNet-T embeddings
  - [ ] ONNX export & torch.export backend
+ - [ ] cuEquivariance/OpenEquivariance backend for the layers
 
 Pull requests welcome.

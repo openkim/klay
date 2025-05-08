@@ -166,6 +166,46 @@ Input references
    * - any alias
      - whatever ``output:`` mapped under that name
 
+Irreducible–representation (irrep) blocks
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+klay follows the same compact string format as **e3nn** but lets you
+declare each block as a dictionary—convenient for YAML and
+programmatic construction. This ensures readability and abstracts away any e3nn specific
+notation.
+
+Each block has
+
+* ``l`` – the total angular-momentum order (integer ≥ 0)
+* ``mul`` – multiplicity, i.e. how many copies of that irrep
+* optional ``p`` – explicit parity, ``"even"`` or ``"odd"``
+
+Default parity
+--------------
+
+If the ``p`` key is omitted, klay assigns it automatically:
+
+* ``e`` (even) when ``l`` is even
+* ``o`` (odd)  when ``l`` is odd
+
+Example
+-------
+
+.. code-block:: python
+
+   blocks = [
+       {"l": 0, "mul": 64},                # 0  → default even  → 64x0e
+       {"l": 1, "mul": 32},                # 1  → default odd   → 32x1o
+       {"l": 2, "mul": 16, "p": "odd"},    # explicit override → 16x2o
+   ]
+
+   >>> irreps_blocks_to_string(blocks)
+   '64x0e + 32x1o + 16x2o'
+
+Copy-and-paste the block list into your ``*.yaml`` model file or build
+it on the fly in Python; klay will convert it to the canonical irrep
+string wherever an ``irreps_*`` field is expected.
+
 
 Output mapping
 ~~~~~~~~~~~~~~
