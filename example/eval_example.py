@@ -1,12 +1,18 @@
 import torch
 
+torch.set_default_dtype(torch.float64)  # for reproducibility
+
 from klay.builder.fx_builder import build_fx_model
 from klay.io.load_config import load_config
 
 # ---------------------------------------------------------------------
 # 1. load & build
-cfg = load_config("example/new_model.yaml")  # path to *your* YAML
-model = build_fx_model(cfg).eval()  # no gradients needed
+cfg = load_config("new_model.yaml")  # path to *your* YAML
+model = build_fx_model(cfg)  # no gradients needed
+
+from e3nn.util import jit
+
+model = jit.script(model)  # optional, for faster inference
 
 # ---------------------------------------------------------------------
 # 2. pick a toy system size

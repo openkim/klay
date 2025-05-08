@@ -4,22 +4,22 @@ model_params:
   num_elems: 2
 
 model_inputs:
-  atomic_numbers: "Tensor (N,)"
-  positions: "Tensor (N,3)"
-  edge_index: "Tensor (2,E)"
+  species: "Tensor (N,)"
+  coords: "Tensor (N,3)"
+  edge_index0: "Tensor (2,E)"
 
 model_layers:
   element_embedding:
     type: OneHotAtomEncoding
     config: {num_elems: 2}
-    inputs: {x: model_inputs.atomic_numbers}
+    inputs: {x: model_inputs.species}
 
   edge_feature0:
     type: SphericalHarmonicEdgeAttrs
     config: {lmax: 1}
     inputs:
-      pos: model_inputs.positions
-      edge_index: model_inputs.edge_index
+      pos: model_inputs.coords
+      edge_index: model_inputs.edge_index0
     output: {0: vec0, 1: len0, 2: sh0}
 
   radial_basis_func:
@@ -54,7 +54,7 @@ model_layers:
       node_feats: node_features
       node_attrs: element_embedding
       edge_feats: radial_basis_func
-      edge_index: model_inputs.edge_index
+      edge_index: model_inputs.edge_index0
 
   output_projection:
     type: AtomwiseLinear
@@ -66,13 +66,13 @@ model_layers:
         - {"l": 0, "mul": 1}
     inputs: {h: conv1}
 
-  forces:
-    type: AutogradForces
-    inputs:
-      energy: output_projection
-      pos: model_inputs.positions
+    #  forces:
+    #type: AutogradForces
+    #inputs:
+    #  energy: output_projection
+    #  pos: model_inputs.coords
 
 model_outputs:
   energy: output_projection
-  forces: forces
-  representation: conv1
+  #  forces: forces
+  #representation: conv1

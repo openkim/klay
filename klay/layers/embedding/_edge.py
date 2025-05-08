@@ -47,10 +47,11 @@ class SphericalHarmonicEdgeAttrs(_BaseLayer, torch.nn.Module):
             self.irreps_edge_sh, edge_sh_normalize, edge_sh_normalization
         )
 
-    def forward(self, pos, edge_index, shift=None):
+    def forward(self, pos, edge_index, shift: Optional[torch.Tensor] = None):
         edge_vec = pos[edge_index[1]] - pos[edge_index[0]]  # 0 -> 1
-        if shift is not None:
-            edge_vec = edge_vec - shift
+        if shift is None:
+            shift = edge_vec.new_zeros(edge_vec.shape)
+        edge_vec = edge_vec - shift
         edge_length = torch.linalg.norm(edge_vec, dim=1)
         edge_sh = self.sh(edge_vec)
         return edge_vec, edge_length, edge_sh

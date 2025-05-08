@@ -2,12 +2,16 @@ import torch
 
 torch.set_default_dtype(torch.float64)  # for reproducibility
 
+from e3nn.util import jit
+
 from klay.builder import build_model
 from klay.io import load_config
 
 # 1. load & build
 cfg = load_config("./mace_model.yaml")  # path to *your* YAML
 model = build_model(cfg).eval()  # no gradients needed
+
+model = jit.script(model)  # optional, but recommended for performance
 
 # 2. pick a toy system size
 N = 6  # number of atoms
