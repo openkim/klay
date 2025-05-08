@@ -99,9 +99,6 @@ class AtomwiseSumIndex(_BaseLayer, torch.nn.Module):
         else:
             return reduced_out[0]  # eval -> runtime in kim-api, contributing enegry
 
-    # --------------------------------------------------------------------- #
-    # Factory for YAML / config usage                                       #
-    # --------------------------------------------------------------------- #
     @classmethod
     def from_config(cls, _: Any = None) -> "AtomwiseSumIndex":
         return cls()
