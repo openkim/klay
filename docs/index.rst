@@ -12,6 +12,7 @@ Welcome to KLay's documentation!
 
    intro
    usage
+   kliff
    api
 
 Indices and tables
