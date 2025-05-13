@@ -72,8 +72,7 @@ class AtomwiseSumIndex(_BaseLayer, torch.nn.Module):
     Scatter-sum along the first dimension.
       - model.train() -> full scatter-summed tensor
       - model.eval()  -> only the first row
-    Fully TorchScript-compatible; the same scripted artefact can be loaded
-    from C++ and will respect `module.eval()`.
+    Fully TorchScript-compatible.
     """
 
     def __init__(self) -> None:
@@ -94,13 +93,38 @@ class AtomwiseSumIndex(_BaseLayer, torch.nn.Module):
         reduced_out = src.new_zeros(out_shape)
         reduced_out.scatter_add_(0, index, src)
 
+        return reduced_out
+
+    @classmethod
+    def from_config(cls) -> "AtomwiseSumIndex":
+        return cls()
+
+
+@register("KIMAPISumIndex", inputs=["src", "index"], outputs=["h"], category=ModuleCategory.LINEAR)
+class KIMAPISumIndex(_BaseLayer, torch.nn.Module):
+    """
+    Wrapper around AtomwiseSumIndex.
+
+    It is crafted specifically for KIM-APPI based applications, where at training time,
+    it will sum like batch index, while at evaluation time, it will return the
+    idx:0 contributing atoms energies
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.scatter_sum = AtomwiseSumIndex()
+
+    def forward(self, src: torch.Tensor, index: torch.Tensor) -> torch.Tensor:
+
+        reduced_out = self.scatter_sum(src, index)
+
         if self.training:
             return reduced_out  # training -> full tensor
         else:
             return reduced_out[0]  # eval -> runtime in kim-api, contributing enegry
 
     @classmethod
-    def from_config(cls) -> "AtomwiseSumIndex":
+    def from_config(cls) -> "KIMAPISumIndex":
         return cls()
 
 

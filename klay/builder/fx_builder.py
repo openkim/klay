@@ -2,8 +2,6 @@
 Turn a NetworkX DAG into torch.fx.GraphModule.
 """
 
-from __future__ import annotations
-
 import operator
 from typing import Any, Dict, Optional
 

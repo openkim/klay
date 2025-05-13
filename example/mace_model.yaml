@@ -7,7 +7,7 @@ model_inputs:
   species: "Tensor (N,)"
   coords: "Tensor (N,3)"
   edge_index0: "Tensor (2,E)"
-  contributing: "Tensor (E,)"
+  contributions: "Tensor (E,)"
 
 model_layers:
   element_embedding:
@@ -67,13 +67,11 @@ model_layers:
         - {"l": 0, "mul": 1}
     inputs: {h: conv1}
 
-    #  forces:
-    #type: AutogradForces
-    #inputs:
-    #  energy: output_projection
-    #  pos: model_inputs.coords
+  contributions_energy:
+    type: KIMAPISumIndex
+    inputs:
+      src: output_projection
+      index: contributions
 
 model_outputs:
-  energy: output_projection
-  #  forces: forces
-  #representation: conv1
+  energy: contributions_energy
