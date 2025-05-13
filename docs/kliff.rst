@@ -181,10 +181,10 @@ re-used for checkpoint-free restarts.
        "path": "Si_training_set_4_configs",
        "shuffle": True
    }
-    model = {"name": "MACE1",
+   model = {"name": "MACE1",
              "input_args":
              ["species", "coords", "edge_index0", "contributions"]
-             }}
+   }
    transforms = {
        "configuration": {
            "name": "RadialGraph",
