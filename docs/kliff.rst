@@ -69,74 +69,84 @@ build time, so you only declare each hyper-parameter once.
 
 .. code-block:: yaml
 
-   model_params:
-     r_max: 4.0
-     n_channels: 32
-     num_elems: 2
+    model_params:
+      r_max: 4.0
+      n_channels: 32
+      num_elems: 2
 
-   model_inputs:
-     species: "Tensor (N,)"
-     coords:  "Tensor (N,3)"
-     edge_index0: "Tensor (2,E)"
+    model_inputs:
+      species: "Tensor (N,)"
+      coords: "Tensor (N,3)"
+      edge_index0: "Tensor (2,E)"
+      contributions: "Tensor (E,)"
 
-   model_layers:
-     element_embedding:
-       type: OneHotAtomEncoding
-       config: {num_elems: 2}
-       inputs: {x: model_inputs.species}
+    model_layers:
+      element_embedding:
+        type: OneHotAtomEncoding
+        config: {num_elems: 2}
+        inputs: {x: model_inputs.species}
 
-     edge_feature0:
-       type: SphericalHarmonicEdgeAttrs
-       config: {lmax: 1}
-       inputs:
-         pos: model_inputs.coords
-         edge_index: model_inputs.edge_index0
-       output: {0: vec0, 1: len0, 2: sh0}
+      edge_feature0:
+        type: SphericalHarmonicEdgeAttrs
+        config: {lmax: 1}
+        inputs:
+          pos: model_inputs.coords
+          edge_index: model_inputs.edge_index0
+        output: {0: vec0, 1: len0, 2: sh0}
 
-     radial_basis_func:
-       type: RadialBasisEdgeEncoding
-       config: {r_max: ${model_params.r_max}}
-       inputs: {edge_length: len0}
+      radial_basis_func:
+        type: RadialBasisEdgeEncoding
+        config:
+          r_max: ${model_params.r_max}
+        inputs:
+          edge_length: len0
 
-     node_features:
-       type: AtomwiseLinear
-       config:
-         irreps_in_block:
-           - {"l": 0, "mul": '${model_params.num_elems}'}
-         irreps_out_block:
-           - {"l": 0, "mul": '${model_params.n_channels}'}
-       inputs: {h: element_embedding}
+      node_features:
+        type: AtomwiseLinear
+        config:
+          irreps_in_block:
+            - {"l": 0, "mul": '${model_params.num_elems}'}
+          irreps_out_block:
+            - {"l": 0, "mul": '${model_params.n_channels}'}
+        inputs: {h: element_embedding}
 
-     conv1:
-       type: MACE_layer
-       config:
-         lmax: 1
-         correlation: 2
-         num_elements: ${model_params.num_elems}
-         hidden_irreps_block:
-           - {"l": 0, "mul": '${model_params.n_channels}'}
-           - {"l": 1, "mul": '${model_params.n_channels}'}
-         input_block: ${model_layers.node_features.config.irreps_out_block}
-         node_attr_block: ${model_layers.node_features.config.irreps_in_block}
-       inputs:
-         vectors: vec0
-         node_feats: node_features
-         node_attrs: element_embedding
-         edge_feats: radial_basis_func
-         edge_index: model_inputs.edge_index0
+      conv1:
+        type: MACE_layer
+        config:
+          lmax: 1
+          correlation: 2
+          num_elements: ${model_params.num_elems}
+          hidden_irreps_block:
+            - {"l": 0, "mul": '${model_params.n_channels}'}
+            - {"l": 1, "mul": '${model_params.n_channels}'}
+          input_block: ${model_layers.node_features.config.irreps_out_block}
+          node_attr_block: ${model_layers.node_features.config.irreps_in_block}
+        inputs:
+          vectors: vec0
+          node_feats: node_features
+          node_attrs: element_embedding
+          edge_feats: radial_basis_func
+          edge_index: model_inputs.edge_index0
 
-     output_projection:
-       type: AtomwiseLinear
-       config:
-         irreps_in_block:
-           - {"l": 0, "mul": '${model_params.n_channels}'}
-           - {"l": 1, "mul": '${model_params.n_channels}'}
-         irreps_out_block:
-           - {"l": 0, "mul": 1}
-       inputs: {h: conv1}
+      output_projection:
+        type: AtomwiseLinear
+        config:
+          irreps_in_block:
+            - {"l": 0, "mul": '${model_params.n_channels}'}
+            - {"l": 1, "mul": '${model_params.n_channels}'}
+          irreps_out_block:
+            - {"l": 0, "mul": 1}
+        inputs: {h: conv1}
 
-   model_outputs:
-     energy: output_projection
+      contributions_energy:
+        type: KIMAPISumIndex
+        inputs:
+          src: output_projection
+          index: contributions
+
+    model_outputs:
+      energy: contributions_energy
+
 
 -----------------------------------
 Training script (``train_mace.py``)
@@ -160,7 +170,7 @@ re-used for checkpoint-free restarts.
    # Build & script the model
    # ------------------------------------------------------------------
    mace_model = build_model(load_config("mace_model.yaml"))
-   mace_model = jit.script(mace_model)          # TorchScript → picklable, deterministic
+   mace_model = jit.script(mace_model)          # TorchScript -> picklable, deterministic
 
    # ------------------------------------------------------------------
    # Experiment manifest
@@ -171,10 +181,10 @@ re-used for checkpoint-free restarts.
        "path": "Si_training_set_4_configs",
        "shuffle": True
    }
-   model = {
-       "name": "MACE1",
-       "input_args": ["species", "coords", "edge_index0"]
-   }
+    model = {"name": "MACE1",
+             "input_args":
+             ["species", "coords", "edge_index0", "contributions"]
+             }}
    transforms = {
        "configuration": {
            "name": "RadialGraph",
