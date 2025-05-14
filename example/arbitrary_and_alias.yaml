@@ -1,0 +1,36 @@
+model_inputs:
+  x: "(N,16) tensor you feed at runtime"
+
+model_layers:
+  dense:
+    type: ArbitraryModule
+    config:
+      target: torch.nn.Linear     # fully-qualified import path
+      args: [16, 16]               # positional ctor args
+      kwargs: {}                  # (optional) keyword ctor args
+    inputs:
+      0: model_inputs.x           # positional forward arg index 0
+
+  relu:
+    type: ArbitraryModule
+    config:
+      target: torch.nn.ReLU
+      args: []                    # ReLU takes no ctor args
+    inputs:
+      0: dense                        # feed output of dense layer
+
+  second_pass:
+    alias: dense
+    inputs:
+      0: relu
+
+  relu2:
+    type: ArbitraryModule
+    config:
+      target: torch.nn.functional.relu
+    inputs:
+      0: second_pass
+
+
+model_outputs:
+  preds: relu2                        # expose final tensor

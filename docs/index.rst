@@ -13,6 +13,7 @@ Welcome to KLay's documentation!
    intro
    usage
    kliff
+   advance
 
 Indices and tables
 ==================

@@ -10,3 +10,4 @@ class ModuleCategory(Enum):
     LINEAR = auto()
     ATTENTION = auto()
     AUTOGRAD = auto()
+    ARBITRARY = auto()

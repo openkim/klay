@@ -15,7 +15,7 @@ Prerequisites
 -------------
 
 * klay
-* PyTorch ≥ 2.2 (built with CUDA if you train on GPU)
+* PyTorch >= 2.2 (built with CUDA if you train on GPU)
 * e3nn -> for converting equivariant models to jit
 * kliff
 * torch_geometric -> for graph datasets
@@ -64,7 +64,7 @@ Model definition (``mace_model.yaml``)
 --------------------------------------
 
 The YAML file enumerates **parameters**, **I/O tensors**, a **layer
-graph**, and **named outputs**.  klay resolves the `${…}` references at
+graph**, and **named outputs**.  klay resolves the `${...}` references at
 build time, so you only declare each hyper-parameter once.
 
 .. code-block:: yaml

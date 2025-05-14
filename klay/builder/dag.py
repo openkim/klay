@@ -8,6 +8,8 @@ from typing import Any, Dict
 
 import networkx as nx
 
+from ..core.registry import _REGISTRY
+
 
 def build_dag(cfg: Dict[str, Any]) -> nx.DiGraph:
     """
@@ -86,3 +88,36 @@ def _validate_graph(g: nx.DiGraph, declared_layers: set[str]):
 
     if not nx.is_directed_acyclic_graph(g):
         raise ValueError("Dependency graph has cycles")
+
+    # port-exhaustion check
+    for lname, meta in ((n, d["meta"]) for n, d in g.nodes(data=True) if d.get("kind") == "layer"):
+        ltype = meta["type"]
+        spec = _REGISTRY[ltype]
+        expected_in = spec.inputs
+        expected_out = spec.outputs
+
+        # INPUTS
+        if expected_in not in (["*"], "*"):
+            provided_in = set((meta.get("inputs") or {}).keys())
+            missing_in = [p for p in expected_in if p not in provided_in]
+            extra_in = [p for p in provided_in if p not in expected_in]
+            if missing_in or extra_in:
+                raise ValueError(
+                    f"Layer '{lname}' ({ltype}): "
+                    f"missing inputs {missing_in}  |  unexpected inputs {extra_in}"
+                )
+        elif expected_in == ["*"]:
+            print(f"Skipping inputs validation ArbitraryModule layer '{lname}' ({ltype})")
+
+        # OUTPUTS (optional but handy)
+        if expected_out not in (["*"], "*"):
+            provided_out = set((meta.get("output") or {}).keys())
+            missing_out = [p for p in expected_out if p not in provided_out]
+            extra_out = [p for p in provided_out if p not in expected_out]
+            if missing_out or extra_out:
+                raise ValueError(
+                    f"Layer '{lname}' ({ltype}): "
+                    f"missing outputs {missing_out}  |  unexpected outputs {extra_out}"
+                )
+        elif expected_out == ["*"]:
+            print(f"Skipping outputs validation ArbitraryModule layer '{lname}' ({ltype})")

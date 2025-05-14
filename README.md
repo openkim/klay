@@ -4,7 +4,7 @@
 
 ---
 
-# **KLay** — *Composable layers for KLIFF & ML IPs*
+# **KLay** — *Composable layers for KLIFF & MLIPs*
 [![PyPI](https://img.shields.io/pypi/v/klay.svg)](https://pypi.org/project/klay)
 [![Documentation Status](https://readthedocs.org/projects/klay/badge/?version=latest)](https://klay.readthedocs.io/en/latest)
 
