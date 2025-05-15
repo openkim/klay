@@ -59,7 +59,7 @@ Run it:
    out = model(torch.rand(16))      # torch.Size([16])
 
 ----------------------------------------------------------------
-1  Arbitrary Layers  (`ArbitraryModule`)
+1. Arbitrary Layers  (`ArbitraryModule`)
 ----------------------------------------------------------------
 
 ``ArbitraryModule`` turns **any importable Python callable** into a Klay
@@ -98,7 +98,7 @@ Input block rules
 * **Keyword ports** use strings; they map 1-to-1 to argument names.
 
 ------------------------------------------------------------------
-2  Layer Aliases  (weight sharing & staged graphs)
+2. Layer Aliases  (weight sharing & staged graphs)
 ------------------------------------------------------------------
 
 An *alias* creates a **second call-site** to an **already-declared**

@@ -10,6 +10,7 @@ but given the complexity, we decided to extract it into a separate package.
 It is designed to ensure that all generated ML models are compatible with the
 KLIFF-OpenKIM-TorchML framework.
 
+
 Why another library?
 --------------------
 
@@ -27,10 +28,10 @@ tedious to modify.  KLay takes the complementary “LEGO-block” approach:
   TorchScript is possible out-of-the-box.
 
 Key features
-============
+------------
 
 * OmegaConf/YAML schema with variable interpolation.
-* **Alias call-sites** – call the *same* module multiple times → shared
+* **Alias call-sites** – call the *same* module multiple times : shared
   weights.
 * Friendly **CLI**: ``klay validate``, ``klay layers``, ``klay export``.
 * Immediate **autograd force layer** *(optional second-order graph)*.
@@ -46,7 +47,7 @@ Quick installation
    pip install git+https://github.com/openkim/klay.git
 
 One-minute example
-==================
+------------------
 
 .. code-block:: python
 
@@ -68,7 +69,7 @@ One-minute example
 
 
 Architecture in a nutshell
-==========================
+--------------------------
 
 .. mermaid::
 
@@ -81,14 +82,14 @@ Architecture in a nutshell
        FX -->|TorchScript| PT(.pt)
        FX -->|torch.compile| JIT(Optimised model)
 
-* **YAML → DAG** edges = data-dependencies, nodes are inputs / layers /
+* **YAML -> DAG** edges = data-dependencies, nodes are inputs / layers /
   call-site aliases / outputs.
-* **DAG → FX** one placeholder per ``model_input``, one ``call_module`` node
+* **DAG -> FX** one placeholder per ``model_input``, one ``call_module`` node
   per layer, auto-generated ``getitem`` nodes for tuple/dict ports.
-* **FX → Deploy** TorchScript, `torch.compile`, ONNX, etc.
+* **FX -> Deploy** TorchScript, `torch.compile`, ONNX, etc.
 
 Command-line highlights
-=======================
+-----------------------
 
 .. list-table::
    :header-rows: 1
@@ -101,13 +102,10 @@ Command-line highlights
        args are **red**, optional args (with defaults) **yellow**.
      - ``--type embedding`` ``--all``
    * - ``klay validate``
-     - Fatal on missing sources, cycles; warnings for alias→alias, unused
+     - Fatal on missing sources, cycles; warnings for alias, unused
        outputs, dangling layers (optionally fatal).  Can render a Graphviz
        image.
      - ``--allow-dangling`` ``--visualize`` ``--fmt svg``
-   * - ``klay build-layers``
-     - Instantiate all modules when the config lacks inputs/outputs.
-     - —
    * - ``klay export``
      - Build the model and save either a TorchScript ``.pt`` file or a weights
        ``.pth``.
