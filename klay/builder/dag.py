@@ -8,7 +8,7 @@ from typing import Any, Dict
 
 import networkx as nx
 
-from ..core.registry import _REGISTRY
+from ..core.registry import _REGISTRY, NodeMeta
 
 
 def build_dag(cfg: Dict[str, Any]) -> nx.DiGraph:
@@ -41,6 +41,7 @@ def build_dag(cfg: Dict[str, Any]) -> nx.DiGraph:
             parent = canonical_source(src)
             g.add_edge(parent, lname, port=port)
 
+        # outputs
         for real_key, alias in (spec.get("output") or {}).items():
             g.add_node(alias, kind="alias_out", parent=lname, key=real_key)  # meta for info
             g.add_edge(lname, alias, port=real_key)
@@ -101,11 +102,13 @@ def _validate_graph(g: nx.DiGraph, declared_layers: set[str]):
             provided_in = set((meta.get("inputs") or {}).keys())
             missing_in = [p for p in expected_in if p not in provided_in]
             extra_in = [p for p in provided_in if p not in expected_in]
-            if missing_in or extra_in:
-                raise ValueError(
-                    f"Layer '{lname}' ({ltype}): "
-                    f"missing inputs {missing_in}  |  unexpected inputs {extra_in}"
-                )
+            declared_in = spec.inputs
+            if len(declared_in) != len(provided_in):
+                if missing_in or extra_in:
+                    raise ValueError(
+                        f"Layer '{lname}' ({ltype}): "
+                        f"missing inputs {missing_in}  |  unexpected inputs {extra_in}"
+                    )
         elif expected_in == ["*"]:
             print(f"Skipping inputs validation ArbitraryModule layer '{lname}' ({ltype})")
 
@@ -115,9 +118,11 @@ def _validate_graph(g: nx.DiGraph, declared_layers: set[str]):
             missing_out = [p for p in expected_out if p not in provided_out]
             extra_out = [p for p in provided_out if p not in expected_out]
             if missing_out or extra_out:
-                raise ValueError(
-                    f"Layer '{lname}' ({ltype}): "
-                    f"missing outputs {missing_out}  |  unexpected outputs {extra_out}"
-                )
+                declared_out = spec.outputs
+                if len(declared_out) != 1 and len(declared_out) != len(provided_out):
+                    raise ValueError(
+                        f"Layer '{lname}' ({ltype}): "
+                        f"missing outputs {missing_out}  |  unexpected outputs {extra_out}"
+                    )
         elif expected_out == ["*"]:
             print(f"Skipping outputs validation ArbitraryModule layer '{lname}' ({ltype})")

@@ -13,7 +13,7 @@ from .._base import _BaseLayer
 @register(
     "OneHotAtomEncoding",
     inputs=["x"],
-    outputs=["representation"],
+    outputs=["one_hot"],
     category=ModuleCategory.EMBEDDING,
 )
 @compile_mode("script")

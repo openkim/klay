@@ -7,6 +7,7 @@ model_inputs:
   species: "Tensor (N,)"
   coords: "Tensor (N,3)"
   edge_index0: "Tensor (2,E)"
+  shift: "Tensor (E,3)"
   contributions: "Tensor (E,)"
 
 model_layers:
@@ -21,6 +22,7 @@ model_layers:
     inputs:
       pos: model_inputs.coords
       edge_index: model_inputs.edge_index0
+      shift: model_inputs.shift
     output: {0: vec0, 1: len0, 2: sh0}
 
   radial_basis_func:
