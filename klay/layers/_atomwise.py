@@ -3,7 +3,8 @@ from typing import Any, List, Optional
 
 import torch
 import torch.nn.functional
-from e3nn.o3 import Linear
+from e3nn import nn
+from e3nn.o3 import Irreps, Linear
 from torch_runstats.scatter import scatter
 
 from ..core import ModuleCategory, register
@@ -39,6 +40,7 @@ class AtomwiseLinear(_BaseLayer, torch.nn.Module):
         self.linear = Linear(irreps_in=self.irreps_in, irreps_out=self.irreps_out)
 
     def forward(self, h):
+        print(h.dtype, self.linear)
         h = self.linear(h)
         return h
 
@@ -126,6 +128,52 @@ class KIMAPISumIndex(_BaseLayer, torch.nn.Module):
     @classmethod
     def from_config(cls) -> "KIMAPISumIndex":
         return cls()
+
+
+@register("GatedAtomwiseLinear", inputs=["h"], outputs=["h"], category=ModuleCategory.LINEAR)
+class GatedAtomwiseLinear(_BaseLayer, torch.nn.Module):
+    """
+    Linear layer with Gated Nonlinearity. It is reused a lot, hence adding it here
+    for ease of use.
+    """
+
+    def __init__(
+        self,
+        irreps_in: Irreps,
+        irreps_out: Irreps,
+        act_scalars=torch.nn.functional.silu,
+        act_gates=torch.nn.functional.silu,
+    ):
+        super().__init__()
+
+        irreps_scalars = Irreps([(mul, ir) for mul, ir in irreps_in if ir.l == 0])
+        irreps_gated = Irreps([(mul, ir) for mul, ir in irreps_in if ir.l > 0])
+
+        irreps_gates = Irreps(f"{irreps_gated.num_irreps}x0e")
+
+        irreps_hidden = (irreps_scalars + irreps_gates + irreps_gated).simplify()
+
+        self.lin1 = Linear(irreps_in, irreps_hidden)
+
+        self.gate = nn.Gate(
+            irreps_scalars=irreps_scalars,
+            act_scalars=[act_scalars],
+            irreps_gates=irreps_gates,
+            act_gates=[act_gates],
+            irreps_gated=irreps_gated,
+        )
+        self.lin2 = Linear(self.gate.irreps_out, irreps_out)
+        self.irreps_out = irreps_out
+
+    def forward(self, h):
+        h = self.lin2(self.gate(self.lin1(h)))
+        return h
+
+    @classmethod
+    def from_config(cls, irreps_in_block, irreps_out_block) -> "GatedAtomwiseLinear":
+        irreps_in = Irreps(irreps_blocks_to_string(irreps_in_block))
+        irreps_out = Irreps(irreps_blocks_to_string(irreps_out_block))
+        return cls(irreps_in=irreps_in, irreps_out=irreps_out)
 
 
 # class AtomwiseReduce(torch.nn.Module):

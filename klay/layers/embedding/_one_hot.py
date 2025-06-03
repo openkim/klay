@@ -28,7 +28,6 @@ class OneHotAtomEncoding(_BaseLayer, torch.nn.Module):
         self,
         num_elems: int,
         input_is_atomic_number: bool = False,
-        dtype: str = "float64",
     ):
         super().__init__()
         self.num_elems = num_elems
@@ -41,17 +40,16 @@ class OneHotAtomEncoding(_BaseLayer, torch.nn.Module):
         self.register_buffer("z_to_idx_shift", z_to_idx_shift)
         # Output irreps are num_elems even (invariant) scalars
         self.irreps_out = Irreps([(self.num_elems, (0, 1))])
-        self.dtype = get_torch_dtype(dtype)
 
     def forward(self, x):  # TODO input data type
         one_hot = torch.nn.functional.one_hot(x - self.z_to_idx_shift, num_classes=self.num_elems)
         # Convert to float
-        one_hot = one_hot.to(self.dtype)
+        one_hot = one_hot.to(torch.get_default_dtype())
         return one_hot
 
     @classmethod
     def from_config(
-        cls, num_elems: int, input_is_atomic_number: bool = False, dtype: str = "float64"
+        cls, num_elems: int, input_is_atomic_number: bool = False
     ) -> "OneHotAtomEncoding":
         """Create a new instance from the config.
 
@@ -60,4 +58,4 @@ class OneHotAtomEncoding(_BaseLayer, torch.nn.Module):
             input_is_atomic_number: If ``True``, the input is assumed to be atomic numbers.
                 Otherwise, it is assumed to be a 0-based index of the elements.
         """
-        return cls(num_elems=num_elems, input_is_atomic_number=input_is_atomic_number, dtype=dtype)
+        return cls(num_elems=num_elems, input_is_atomic_number=input_is_atomic_number)

@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Optional
 
 import torch
 from e3nn import nn, o3
@@ -7,12 +7,13 @@ from torch_scatter import scatter
 
 from ..core import ModuleCategory, register
 from ..utils import irreps_blocks_to_string
+from ._atomwise import GatedAtomwiseLinear
 from ._base import _BaseLayer
 
 
 @register(
     "E3Attention",
-    inputs=["f", "edge_index", "edge_length", "edge_sh", "edge_length_embedded"],
+    inputs=["f", "edge_index", "edge_lengths", "edge_sh", "edge_length_embeddings"],
     outputs=["f_out"],
     category=ModuleCategory.ATTENTION,
 )
@@ -85,10 +86,10 @@ class E3Attention(_BaseLayer, torch.nn.Module):
     def forward(
         self,
         f: torch.Tensor,
-        edge_index: torch.tensor,
-        edge_length: torch.Tensor,
+        edge_index: torch.Tensor,
+        edge_lengths: torch.Tensor,
         edge_sh: torch.Tensor,
-        edge_length_embedded: torch.Tensor,
+        edge_length_embeddings: torch.Tensor,
     ):
 
         # Q (per-node)
@@ -96,12 +97,12 @@ class E3Attention(_BaseLayer, torch.nn.Module):
 
         edge_src, edge_dst = edge_index[0], edge_index[1]  # 0 -> 1
         # K, V (per-edge)
-        k = self.tp_k(f[edge_dst], edge_sh, self.fc_k(edge_length_embedded))
-        v = self.tp_v(f[edge_src], edge_sh, self.fc_v(edge_length_embedded))
+        k = self.tp_k(f[edge_dst], edge_sh, self.fc_k(edge_length_embeddings))
+        v = self.tp_v(f[edge_src], edge_sh, self.fc_v(edge_length_embeddings))
 
         # Compute unnormalized attention scores
         # get cutoffs from the radial basis?
-        edge_weight_cutoff = soft_unit_step(10.0 * (1.0 - edge_length / self.max_radius))
+        edge_weight_cutoff = soft_unit_step(10.0 * (1.0 - edge_lengths / self.max_radius))
         exp_ijk = edge_weight_cutoff[:, None] * self.dot(q[edge_dst], k).exp()
 
         # Sum for normalization per destination node
@@ -121,10 +122,10 @@ class E3Attention(_BaseLayer, torch.nn.Module):
         irreps_input_block,
         irreps_query_block,
         irreps_key_block,
-        edge_sh_lmax,
         irreps_value_block,
-        number_of_basis: int = 10,
-        max_radius: float = 1.3,
+        edge_sh_lmax,
+        number_of_basis: int = 8,
+        max_radius: float = 4.0,
         radial_neurons: int = 16,
     ) -> Any:
         """Create a new instance from the config.
@@ -133,8 +134,8 @@ class E3Attention(_BaseLayer, torch.nn.Module):
             irreps_input_block: Irreps of the input features.
             irreps_query_block: Irreps of the query embeddings.
             irreps_key_block: Irreps of the key embeddings.
-            edge_sh_lmax: l_max for spherical harmonics
             irreps_value_block: Irreps of the value (also output) embeddings.
+            edge_sh_lmax: l_max for spherical harmonics
             number_of_basis (int): Number of radial basis functions.
             max_radius (float): Radius cutoff for the neighbor graph.
             radial_neurons (int): Hidden size for the radial MLP.
@@ -154,4 +155,96 @@ class E3Attention(_BaseLayer, torch.nn.Module):
             number_of_basis=number_of_basis,
             max_radius=max_radius,
             radial_neurons=radial_neurons,
+        )
+
+
+@register(
+    "E3AttentionPooling",
+    inputs=["f"],
+    outputs=["f_out"],
+    category=ModuleCategory.ATTENTION,
+)
+class E3AttentionPooling(_BaseLayer, torch.nn.Module):
+    """
+    Generates single attention weighted representation from per atom representations
+    """
+
+    def __init__(
+        self,
+        irreps_input: o3.Irreps,
+        irreps_query: o3.Irreps,
+        irreps_key: o3.Irreps,
+    ):
+        """
+        Args:
+            irreps_input (o3.Irreps): Irreps of the input features.
+            irreps_query (o3.Irreps): Irreps of the query embeddings.
+            irreps_key (o3.Irreps): Irreps of the key embeddings.
+        """
+        super().__init__()
+        self.irreps_input = irreps_input
+        self.irreps_query = irreps_query
+        self.irreps_key = irreps_key
+        self.irreps_value = irreps_input
+
+        # Q: linear from input -> query irreps
+        self.h_q = GatedAtomwiseLinear(self.irreps_input, self.irreps_query)
+        self.fc_k = GatedAtomwiseLinear(self.irreps_input, self.irreps_key)
+        self.fc_v = GatedAtomwiseLinear(self.irreps_input, self.irreps_value)
+
+        # Dot product (Q x K) -> scalar (0e)
+        self.dot = o3.FullyConnectedTensorProduct(self.irreps_query, self.irreps_key, "0e")
+
+        self.register_buffer("scale", 1.0 / torch.sqrt(torch.tensor(self.irreps_key.dim)))
+
+        self.irreps_out = irreps_input
+
+    def forward(
+        self,
+        f: torch.Tensor,
+        batch: Optional[torch.Tensor] = None,
+    ):
+        if batch is None:
+            batch = torch.zeros(f.size(0), device=f.device, dtype=torch.long)
+
+        # Q (per-node)
+        q = self.h_q(f)
+
+        # K, V (per-node)
+        # in conventional sec3-transformer you have per edge K, V
+        k = self.fc_k(f)
+        v = self.fc_v(f)
+
+        logits = self.dot(q, k).squeeze(-1) * self.scale
+        weights = logits.exp()
+
+        norm_deg = scatter(weights, batch, dim=0, dim_size=batch.max().item() + 1)
+        norm_deg = norm_deg.clamp(1e-8)
+        f_out = scatter(
+            v * weights.unsqueeze(-1), batch, dim=0, dim_size=batch.max().item() + 1
+        ) / norm_deg.unsqueeze(-1)
+        return f_out
+
+    @classmethod
+    def from_config(
+        cls,
+        irreps_input_block,
+        irreps_query_block,
+        irreps_key_block,
+    ) -> Any:
+        """Create a new instance from the config.
+
+        Parameters:
+            irreps_input_block: Irreps of the input features.
+            irreps_query_block: Irreps of the query embeddings.
+            irreps_key_block: Irreps of the key embeddings.
+        """
+        irreps_input = o3.Irreps(irreps_blocks_to_string(irreps_input_block))
+        irreps_query = o3.Irreps(irreps_blocks_to_string(irreps_query_block))
+        irreps_key = o3.Irreps(irreps_blocks_to_string(irreps_key_block))
+
+        return cls(
+            irreps_input=irreps_input,
+            irreps_query=irreps_query,
+            irreps_key=irreps_key,
         )

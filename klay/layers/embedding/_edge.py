@@ -13,7 +13,7 @@ from ..radial_basis import BesselBasis
 @register(
     "SphericalHarmonicEdgeAttrs",
     inputs=["pos", "edge_index", "shift"],
-    outputs=["edge_vec", "edge_length", "edge_sh"],
+    outputs=["edge_vec", "edge_lengths", "edge_sh"],
     category=ModuleCategory.EMBEDDING,
 )
 @compile_mode("script")
@@ -52,9 +52,9 @@ class SphericalHarmonicEdgeAttrs(_BaseLayer, torch.nn.Module):
         if shift is None:
             shift = edge_vec.new_zeros(edge_vec.shape)
         edge_vec = edge_vec + shift
-        edge_length = torch.linalg.norm(edge_vec, dim=1)
+        edge_lengths = torch.linalg.norm(edge_vec, dim=1)
         edge_sh = self.sh(edge_vec)
-        return edge_vec, edge_length, edge_sh
+        return edge_vec, edge_lengths, edge_sh
 
     @classmethod
     def from_config(cls, *, lmax: int = 1, normalization: Optional[str] = "component"):
@@ -74,7 +74,7 @@ class SphericalHarmonicEdgeAttrs(_BaseLayer, torch.nn.Module):
 
 @register(
     "RadialBasisEdgeEncoding",
-    inputs=["edge_length"],
+    inputs=["edge_lengths"],
     outputs=["edge_length_embedded"],
     category=ModuleCategory.EMBEDDING,
 )
@@ -92,8 +92,8 @@ class RadialBasisEdgeEncoding(_BaseLayer, torch.nn.Module):
         self.cutoff = cutoff(**cutoff_kwargs)
         self.irreps_out = o3.Irreps([(self.basis.num_basis, (0, 1))])
 
-    def forward(self, edge_length):
-        edge_length_embedded = self.basis(edge_length) * self.cutoff(edge_length)[:, None]
+    def forward(self, edge_lengths):
+        edge_length_embedded = self.basis(edge_lengths) * self.cutoff(edge_lengths)[:, None]
         return edge_length_embedded
 
     @classmethod
