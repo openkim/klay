@@ -22,10 +22,10 @@ class ElectronicConfigurationEncoding(_BaseLayer, torch.nn.Module):
     Z 1s 2s 2p 3s 3p 4s 3d 4p 5s 4d 5p 6s 4f 5d 6p vs vp vd vf
     """
 
-    def __init__(self, dtype: str = "float64"):
+    def __init__(self):
         super().__init__()
         self.irreps_out = Irreps([(24, (0, 1))])
-        self.dtype = get_torch_dtype(dtype)
+        self.dtype = torch.get_default_dtype()
         e_config = torch.tensor(
             [  # Z    1s 2s 2p 3s 3p 3d  4s 4p 4d  5s 5p 4f  5d  6s 6p 5f  6d  7s 7p vs vp vd   vf
                 [1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
@@ -157,5 +157,5 @@ class ElectronicConfigurationEncoding(_BaseLayer, torch.nn.Module):
         return representation
 
     @classmethod
-    def from_config(cls, dtype: str = "float64"):
-        return cls(dtype=dtype)
+    def from_config(cls):
+        return cls()

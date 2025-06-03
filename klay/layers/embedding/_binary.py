@@ -20,10 +20,10 @@ class BinaryAtomicNumberEncoding(_BaseLayer, torch.nn.Module):
     and returns a 1-0 encoding of atomic numbers of width 8.
     """
 
-    def __init__(self, dtype: str = "float64"):
+    def __init__(self):
         super().__init__()
         self.irreps_out = Irreps([(8, (0, 1))])
-        self.dtype = get_torch_dtype(dtype)
+        self.dtype = torch.get_default_dtype()
 
     def forward(self, x):
         representation = torch.zeros(x.size(0), 8, dtype=x.dtype, device=x.device)
@@ -34,5 +34,5 @@ class BinaryAtomicNumberEncoding(_BaseLayer, torch.nn.Module):
         return representation
 
     @classmethod
-    def from_config(cls, dtype: str = "float64") -> "BinaryAtomicNumberEncoding":
-        return cls(dtype=dtype)
+    def from_config(cls) -> "BinaryAtomicNumberEncoding":
+        return cls()

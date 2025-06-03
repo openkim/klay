@@ -13,7 +13,7 @@ from ..core import build as build_layer
 from .dag import build_dag, canonical_source
 
 
-def build_fx_model(cfg: Dict[str, Any], dag: Optional[nx.DiGraph] = None) -> nn.Module:
+def build_fx_model(cfg: Dict[str, Any], dag: Optional[nx.MultiDiGraph] = None) -> nn.Module:
     dag = dag or build_dag(cfg)
     layers_cfg = cfg["model_layers"]
 

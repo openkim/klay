@@ -17,7 +17,7 @@ def build_dag(cfg: Dict[str, Any]) -> nx.DiGraph:
     It is used for sanity analysis mostly, as fx.graph can directly
     build a DAG from the model.
     """
-    g = nx.DiGraph()
+    g = nx.MultiDiGraph()
     inputs_cfg = cfg.get("model_inputs", {})
     layers_cfg = cfg["model_layers"]
     outputs_cfg = cfg.get("model_outputs", {})

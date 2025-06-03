@@ -1,7 +1,8 @@
-# klay/__init__.py
-from importlib import import_module
+from importlib import import_module, metadata
 from pathlib import Path
 from typing import Union
+
+__version__ = metadata.version("klay")
 
 _layers_root = Path(__file__).with_suffix("").parent / "layers"
 
