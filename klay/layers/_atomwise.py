@@ -40,7 +40,6 @@ class AtomwiseLinear(_BaseLayer, torch.nn.Module):
         self.linear = Linear(irreps_in=self.irreps_in, irreps_out=self.irreps_out)
 
     def forward(self, h):
-        print(h.dtype, self.linear)
         h = self.linear(h)
         return h
 
