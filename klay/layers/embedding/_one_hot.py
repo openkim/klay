@@ -1,4 +1,3 @@
-from typing import Any
 
 import torch
 import torch.nn.functional
@@ -6,7 +5,6 @@ from e3nn.o3 import Irreps
 from e3nn.util.jit import compile_mode
 
 from ...core import ModuleCategory, register
-from ...utils.misc import get_torch_dtype
 from .._base import _BaseLayer
 
 
@@ -38,13 +36,19 @@ class OneHotAtomEncoding(_BaseLayer, torch.nn.Module):
 
         z_to_idx_shift = torch.tensor(1) if input_is_atomic_number else torch.tensor(0)
         self.register_buffer("z_to_idx_shift", z_to_idx_shift)
+        # Capture the default float dtype at construction time via a registered buffer.
+        # torch.get_default_dtype() is not supported in TorchScript, but reading .dtype
+        # from a buffer is. The dtype is intentionally fixed at construction — if float64
+        # training is desired, set torch.set_default_dtype(torch.float64) before building
+        # the model, and this buffer (and all other model parameters) will be float64.
+        self.register_buffer("_dtype_ref", torch.zeros(1, dtype=torch.get_default_dtype()))
         # Output irreps are num_elems even (invariant) scalars
         self.irreps_out = Irreps([(self.num_elems, (0, 1))])
 
     def forward(self, x):  # TODO input data type
         one_hot = torch.nn.functional.one_hot(x - self.z_to_idx_shift, num_classes=self.num_elems)
         # Convert to float
-        one_hot = one_hot.to(torch.get_default_dtype())
+        one_hot = one_hot.to(self._dtype_ref.dtype)
         return one_hot
 
     @classmethod

@@ -29,7 +29,7 @@ model_layers:
     config:
       r_max: ${model_params.r_max}
     inputs:
-      edge_length: len0
+      edge_lengths: len0
 
   node_features:
     type: AtomwiseLinear
